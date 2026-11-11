@@ -78,8 +78,15 @@ def test_judge_invalid_model_output_falls_back(bad):
 
 def test_judge_nothing_revealed_skips_model():
     p = FakeProvider("x")
-    r = Judge(p).judge(JudgeRequest.model_validate({**JUDGE_REQ, "revealed_clue_ids": []}))
+    r = Judge(p).judge(JudgeRequest.model_validate({**FREE_REQ, "revealed_clue_ids": []}))
     assert r.source == "fixed" and p.calls == 0 and {x.result for x in r.results} == {"not_shown"}
+
+
+def test_choices_always_give_choices_source():
+    """선택지로만 답하면 드러난 단서가 없어도 source 는 늘 choices"""
+    r = Judge(FakeProvider("x")).judge(JudgeRequest.model_validate({**JUDGE_REQ, "revealed_clue_ids": []}))
+    assert r.source == "choices" and {x.result for x in r.results} == {"not_shown"}
+    assert r.normal_outcome is None
 
 
 def test_judge_masks_child_pii():
@@ -165,3 +172,30 @@ def test_judge_and_feedback_http(start_server):
     status, fb = client.request("POST", "/internal/v1/practice/feedback",
                                 {"scenario_id": SID, "results": judged["results"]})
     assert status == 200 and fb == FEEDBACK_RES
+
+
+# ---- 감탄문 등으로 문장이 늘어도 버리지 않고 줄여서 쓴다 ------------------------------
+
+def test_long_card_and_closing_are_shortened_not_dropped():
+    cards = [{"clue_id": "too_good_pay", "text": "와! 잘 생각했어요. 너무 좋은 조건은 의심해요. 어른과 확인해요."},
+             {"clue_id": "advance_payment", "text": "정말 잘했어요! 돈은 먼저 보내지 않아요."}]
+    closing = "오늘 정말 잘했어요! 다음에도 같이 연습해요."
+    r = Judge(FakeProvider(feedback_reply(cards=cards, closing_line=closing))).feedback(
+        FeedbackRequest.model_validate(FEEDBACK_REQ))
+    assert r.source == "model"
+    assert r.cards[0].text == "와! 잘 생각했어요. 너무 좋은 조건은 의심해요."
+    assert r.closing_line == closing
+
+
+def test_feedback_problem_reasons():
+    from app.judge import feedback_problem
+    assert feedback_problem("잘했어요.") is None
+    assert "숫자" in feedback_problem("3번 잘했어요.")
+    assert "안전 필터" in feedback_problem("바보 같아요.")
+
+
+def test_short_exclamations_do_not_count_as_sentences():
+    from app.jsonutil import first_sentences
+    text = "와! 정말 잘했어요! 먼저 돈을 내라는 말이 이상하다는 걸 알아챘네요. 앞으로도 그렇게 해요."
+    assert first_sentences(text, 2) == "와! 정말 잘했어요! 먼저 돈을 내라는 말이 이상하다는 걸 알아챘네요."
+    assert first_sentences("하나예요. 둘이에요.", 2) == "하나예요. 둘이에요."

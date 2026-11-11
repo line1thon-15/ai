@@ -149,11 +149,13 @@ class JudgeResponse(BaseModel):
     results: list[ClueResult]  # 시나리오의 모든 단서, 시나리오 순서. 안 드러난 단서는 not_shown
     # choices: 아이가 고른 선택지로 판정 (모델 안 씀) / model·fallback: 글로 쓴 답을 판정
     source: Literal["choices", "model", "fallback", "fixed"]
+    # 정상 상황에서만: correct(의심·거절)를 한 번이라도 고르면 over_warned, 아니면 trusted_correctly. 위험 상황은 null
+    normal_outcome: Literal["trusted_correctly", "over_warned"] | None = None
 
 
 class FeedbackRequest(BaseModel):
     scenario_id: str = Field(min_length=1, max_length=64)
-    results: list[ClueResult] = Field(min_length=1, max_length=20)
+    results: list[ClueResult] = Field(default_factory=list, max_length=20)  # 정상 상황은 빈 목록
     messages: list[Message] = Field(default_factory=list, max_length=40)  # 선택: 아이 말에 맞춘 피드백용
     variant: Variant | None = None
 

@@ -13,7 +13,7 @@ from app.schemas import TurnRequest
 CONTRACTS = Path(__file__).resolve().parent.parent / "contracts"
 SID = "scam_dm_parttime_01"
 OPENING = "안녕하세요! 집에서 폰으로 하루 두 시간만 하면 되는 알바예요. 하루에 20만 원 벌 수 있어요. 관심 있으세요?"
-ADVANCE_LINE = "시작하려면 교육비 3만 원만 먼저 보내 주세요. 일을 시작하면 바로 돌려드려요."
+ADVANCE_LINE = "시작하려면 교육비 3만 원만 먼저 보내 주세요. 일을 시작하면 그때 돌려드려요."
 
 
 def reply(text, ids=(), choices=None):

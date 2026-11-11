@@ -1,6 +1,6 @@
 {
   "status": "ok",
-  "reply": "시작하려면 교육비 3만 원만 먼저 보내 주세요. 일을 시작하면 바로 돌려드려요.",
+  "reply": "시작하려면 교육비 3만 원만 먼저 보내 주세요. 일을 시작하면 그때 돌려드려요.",
   "revealed_clue_ids": [
     "too_good_pay",
     "advance_payment"
@@ -10,18 +10,18 @@
   "choices": [
     {
       "id": "c1",
-      "text": "네, 지금 바로 보낼게요!",
-      "kind": "other"
+      "text": "교육비를 먼저 내라니 이상해요. 안 보낼래요.",
+      "kind": "correct"
     },
     {
       "id": "c2",
-      "text": "돌려준다고 하니까… 일단 보내 볼까요?",
-      "kind": "doubtful"
+      "text": "네, 교육비는 지금 바로 보낼게요.",
+      "kind": "other"
     },
     {
       "id": "c3",
-      "text": "교육비를 먼저 내라는 건 이상해요. 부모님께 물어볼게요.",
-      "kind": "correct"
+      "text": "돌려준다고 하니까, 일단 보내 볼게요.",
+      "kind": "doubtful"
     }
   ],
   "choices_source": "model",

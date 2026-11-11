@@ -70,7 +70,7 @@ def resolve(scenarios: dict, scenario_id: str, variant: Variant | None = None) -
     base = get_base(scenarios, scenario_id)
     if variant is None:
         return base
-    if check_variant(base, variant):
+    if base.get("kind") == "normal" or check_variant(base, variant):  # 정상 상황은 변형이 없다
         raise InvalidVariant(scenario_id)
     return {
         **base,

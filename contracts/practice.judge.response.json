@@ -17,5 +17,6 @@
       "result": "not_shown"
     }
   ],
-  "source": "choices"
+  "source": "choices",
+  "normal_outcome": null
 }

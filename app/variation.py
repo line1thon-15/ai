@@ -15,7 +15,7 @@ from pydantic import ValidationError
 from .content import load_all_scenarios
 from .jsonutil import clean_text, parse_json_object
 from .providers import LLMProvider, QuotaExceeded
-from .scenarios import CLUE_DEFS, base_as_variant, check_variant, get_base
+from .scenarios import CLUE_DEFS, InvalidVariant, base_as_variant, check_variant, get_base
 from .schemas import AiRole, ClueVariant, Variant, VariantRequest, VariantResponse
 
 MAX_ATTEMPTS = 2
@@ -26,6 +26,8 @@ PLATFORM_NAMES = {
     "text_message": "문자 메시지",
     "friend_intro": "아는 사람의 소개",
     "job_board": "채용 사이트 공고",
+    "game_chat": "게임 속 채팅(귓속말)",
+    "school_notice": "학교 알림장",
 }
 
 
@@ -42,6 +44,8 @@ class Variator:
 
     def generate(self, req: VariantRequest) -> VariantResponse:
         base = get_base(self.scenarios, req.scenario_id)
+        if base.get("kind") == "normal":  # 정상 상황은 변형하지 않는다
+            raise InvalidVariant(req.scenario_id)
         axes = base["variation_axes"]
         for field in ("platform", "tone", "context"):
             value = getattr(req, field)

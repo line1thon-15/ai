@@ -21,21 +21,22 @@ _NUMBER = re.compile(r"\d+")
 def build_prompt(req: SummaryRequest) -> str:
     found = ", ".join(req.found_clues) or "없음"
     missed = ", ".join(req.missed_clues) or "없음"
-    level = req.growth_level or "정보 없음"
+    # 성장 수준은 보내지 않는 것이 기본(백엔드 합의: 검증 안 된 등급은 보이지 않음). 값이 올 때만 넣는다
+    level = f"성장 수준: {req.growth_level}\n" if req.growth_level else ""
     return (
         "너는 경계선 지능 청소년의 생활 판단 연습을 돕는 서비스에서 보호자에게 학습 내용을 알려 주는 역할이야.\n"
         "아래 기록만 바탕으로 보호자가 읽을 요약을 쓰되, 규칙을 지켜.\n"
         "- 1~2문장, 쉬운 말, 존댓말 대신 '~해요' 체.\n"
         "- 잘한 점을 먼저 말하고, 다음에 연습하면 좋을 점을 한 가지만 부드럽게 제안해.\n"
         "- 아이를 평가하거나 비난하지 말고, 진단·병명·점수·순위 표현은 쓰지 마.\n"
-        "- 아래에 없는 숫자나 사실을 만들지 마.\n"
+        "- 아래에 없는 숫자나 사실을 만들지 마. 수준이나 등급을 판단하는 말(예: 잘하는 편, 부족한 편)도 쓰지 마.\n"
         "- 아이가 한 말·쓴 글을 인용하지 마.\n"
         "- 요약 문장만 출력해. 제목·따옴표·목록 없이.\n\n"
         f"영역: {req.area}\n"
         f"연습 횟수: {req.practice_count}\n"
         f"찾은 단서: {found}\n"
         f"놓친 단서: {missed}\n"
-        f"성장 수준: {level}\n"
+        f"{level}"
     )
 
 

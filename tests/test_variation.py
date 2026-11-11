@@ -39,7 +39,7 @@ def gen(reply, **req):
 
 # ---- 원본 콘텐츠 ------------------------------------------------------------
 
-@pytest.mark.parametrize("sid", list(SCENARIOS))
+@pytest.mark.parametrize("sid", [k for k, v in SCENARIOS.items() if v["kind"] == "risk"])
 def test_base_scenarios_pass_variant_check(sid):
     assert check_variant(SCENARIOS[sid], base_as_variant(SCENARIOS[sid])) == []
 

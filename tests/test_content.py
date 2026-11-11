@@ -38,6 +38,22 @@ def test_example_lines_contain_clue_keyword(clue):
         assert any(k in line for k in clue["keywords"]), f"{clue['id']}: {line}"
 
 
+@pytest.mark.parametrize("clue", DATA["clues"], ids=lambda c: c["id"])
+def test_sources_are_well_formed(clue):
+    """출처: 기관·제목·주소·근거 문장이 있고, 근거 강도는 direct(직접) / indirect(간접)."""
+    assert isinstance(clue.get("sources"), list)
+    for s in clue["sources"]:
+        assert s["org"] and s["title"] and s["evidence"]
+        assert s["url"].startswith("https://")
+        assert s["strength"] in ("direct", "indirect")
+
+
+def test_scam_clues_all_have_direct_public_sources():
+    """시연 영역(사기)의 단서는 모두 공공기관 직접 근거가 있어야 한다."""
+    for c in clues_for_area(DATA, "scam"):
+        assert any(s["strength"] == "direct" for s in c["sources"]), c["id"]
+
+
 def test_every_area_has_enough_clues():
     for area in AREA_IDS:
         assert len(clues_for_area(DATA, area)) >= 4, area
