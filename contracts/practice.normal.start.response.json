@@ -23,5 +23,6 @@
       "kind": "correct"
     }
   ],
-  "choices_source": "template"
+  "choices_source": "template",
+  "hint": null
 }

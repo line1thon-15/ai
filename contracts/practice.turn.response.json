@@ -26,5 +26,6 @@
   ],
   "choices_source": "model",
   "masked": false,
-  "source": "model"
+  "source": "model",
+  "hint": null
 }

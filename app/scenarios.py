@@ -25,8 +25,39 @@ def has_clue_keyword(text: str, clue_id: str) -> bool:
     return any(k in text for k in CLUE_DEFS[clue_id].get("keywords", []))
 
 
+# T-34: 정상 상황 변형에 들어가면 안 되는 위험 표현 (단서 키워드보다 좁게: '원', '지금' 같은 흔한 말은 뺀다)
+NORMAL_RISK_PHRASES = (
+    "오픈채팅", "모르는 사람", "모르는 계정", "입금", "보증금", "교육비", "수수료", "선입금", "송금", "계좌", "비밀번호", "신분증", "주민",
+    "비밀로", "말하지 마", "말하면 안", "링크", "설치", "example.com", "당장", "빨리", "오늘까지", "오늘만",
+    "빌려", "책임질",
+)
+
+
+def check_normal_variant(base: dict, v: Variant) -> list[str]:
+    """정상 상황 변형: 단서가 없어야 하고, 위험 표현이 섞이면 안 된다."""
+    problems = []
+    if v.base_scenario_id != base["id"]:
+        problems.append("base_scenario_id")
+    if v.platform != base["platform"]:  # 정상 상황은 원래 플랫폼만
+        problems.append("platform")
+    if v.clues:
+        problems.append("clue_ids")
+    # 원본에 이미 있는 표현은 허용 (예: "고객센터는 비밀번호를 절대 묻지 않아요")
+    base_text = " ".join([base["title"], base["child_setup"], base["opening_line"], base["ai_role"]["persona"]])
+    for name, text in [("opening_line", v.opening_line), ("child_setup", v.child_setup), ("title", v.title),
+                       ("ai_role", v.ai_role.name + " " + v.ai_role.persona)]:
+        if not check_output(text, "roleplay").allowed:
+            problems.append(f"unsafe:{name}")
+        hits = [w for w in NORMAL_RISK_PHRASES if w in text and w not in base_text]
+        if hits:
+            problems.append(f"risk_phrase:{name}:{hits[0]}")
+    return problems
+
+
 def check_variant(base: dict, v: Variant) -> list[str]:
     """변형이 단서 틀을 지켰는지 확인한다. 문제 목록을 돌려준다 (비어 있으면 통과)."""
+    if base.get("kind") == "normal":
+        return check_normal_variant(base, v)
     problems = []
     if v.base_scenario_id != base["id"]:
         problems.append("base_scenario_id")
@@ -70,7 +101,7 @@ def resolve(scenarios: dict, scenario_id: str, variant: Variant | None = None) -
     base = get_base(scenarios, scenario_id)
     if variant is None:
         return base
-    if base.get("kind") == "normal" or check_variant(base, variant):  # 정상 상황은 변형이 없다
+    if check_variant(base, variant):
         raise InvalidVariant(scenario_id)
     return {
         **base,

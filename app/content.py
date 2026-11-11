@@ -27,7 +27,8 @@ def load_all_scenarios() -> dict[str, dict]:
             result[s["id"]] = {**s, **common, "kind": "risk"}
             for n in s.get("normal_situations", []):
                 result[n["id"]] = {**n, **common, "kind": "normal", "base_scenario_id": s["id"],
-                                   "child_setup": n["summary"], "clues": []}
+                                   "child_setup": n["summary"], "clues": [],
+                                   "variation_axes": s["variation_axes"]}  # T-34: 부모 시나리오의 변형 축
     return result
 
 

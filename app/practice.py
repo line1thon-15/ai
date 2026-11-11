@@ -14,6 +14,7 @@ import re
 
 from .choices import NORMAL_GENERIC, arrange, template_texts, validate_texts
 from .content import load_all_scenarios, load_clues
+from .hints import hint_text
 from .jsonutil import clean_text, parse_json_object, split_sentences
 from .providers import LLMProvider, QuotaExceeded
 from .safety import MESSAGES, check_input, check_output, mask_pii
@@ -42,7 +43,7 @@ class PracticeEngine:
         return resolve(self.scenarios, scenario_id, variant)
 
     # ---- 첫 대사 ----------------------------------------------------------
-    def start(self, scenario_id: str, variant: Variant | None = None) -> StartResponse:
+    def start(self, scenario_id: str, variant: Variant | None = None, hint_level: int = 0) -> StartResponse:
         s = self._scenario(scenario_id, variant)
         opening = [c["id"] for c in s["clues"] if c.get("at_opening")]
         target = opening[0] if opening else None
@@ -55,10 +56,18 @@ class PracticeEngine:
             target_clue_id=target,
             choices=arrange(_templates(s, target)),
             choices_source="template",
+            hint=hint_text(s, target, hint_level),
         )
 
     # ---- 다음 턴 ----------------------------------------------------------
     def turn(self, req: TurnRequest) -> TurnResponse:
+        res = self._turn(req)
+        if res.status != "safe_reply" and req.hint_level:
+            # T-74: 이번 응답이 다루는 단서(target_clue_id)에 맞춘 힌트
+            res.hint = hint_text(self._scenario(req.scenario_id, req.variant), res.target_clue_id, req.hint_level)
+        return res
+
+    def _turn(self, req: TurnRequest) -> TurnResponse:
         s = self._scenario(req.scenario_id, req.variant)
         valid_ids = [c["id"] for c in s["clues"]]
         revealed = [i for i in dict.fromkeys(req.revealed_clue_ids) if i in valid_ids]

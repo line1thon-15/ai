@@ -1,0 +1,18 @@
+{
+  "variant": {
+    "base_scenario_id": "normal_cafe_01",
+    "platform": "friend_intro",
+    "tone": "친구처럼 편한 말투",
+    "context": "동네 카페 사장님의 알바 제안",
+    "title": "학교 앞 분식집 주말 알바",
+    "child_setup": "아는 사람 소개로 학교 앞 분식집 사장님이 주말 알바를 제안해요.",
+    "opening_line": "안녕하세요, 주말에 가게 일을 도와줄 사람을 찾고 있어요. 부모님과 같이 가게에 와서 이야기해요.",
+    "ai_role": {
+      "name": "분식집 사장님",
+      "persona": "친절하고 차분한 사장님. 부모님과 함께 오라고 한다.",
+      "tone": "친구처럼 편한 말투"
+    },
+    "clues": []
+  },
+  "source": "model"
+}

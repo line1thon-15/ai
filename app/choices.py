@@ -28,6 +28,8 @@ SAFE_MARKERS = (
     "수 없", "안 될", "안 돼", "못 해", "생각해 보", "시간이 필요",
 )
 ADULT_WORDS = ("부모님", "엄마", "아빠", "선생님", "어른", "보호자")
+# 정답의 '어른에게 알리기'는 어른 단어 + 알리는 말이 함께 있어야 한다 ("부모님과 오라니 이상해요"는 알리기가 아님)
+TELL_WORDS = ("말할", "말씀", "물어볼", "물어 볼", "여쭤", "알릴", "알려", "보여 줄", "보여줄", "상의", "확인")
 # 정답 선택지에는 '분명한 거절'이나 '어른에게 알리기'만 인정한다.
 # "이상해요"는 의심되는 답("이상하긴 한데…")에도 들어가는 말이고, "생각해 볼게요"는 여지를 두는 말이라 정답 표시가 아니다.
 CORRECT_MARKERS = (
@@ -126,7 +128,8 @@ def choice_problem(data) -> str | None:
     if max(lengths) - min(lengths) > MAX_LENGTH_GAP:
         return f"세 답의 길이 차이 {max(lengths) - min(lengths)}자 (최대 {MAX_LENGTH_GAP}자)"
     correct, other = texts["correct"], texts["other"]
-    if not (any(m in correct for m in CORRECT_MARKERS) or any(a in correct for a in ADULT_WORDS)):
+    tells_adult = any(a in correct for a in ADULT_WORDS) and any(w in correct for w in TELL_WORDS)
+    if not (any(m in correct for m in CORRECT_MARKERS) or tells_adult):
         return f"correct 에 분명한 거절·확인이 없음 ({correct})"
     if any(r in other for r in _REFUSAL):
         return f"other 가 거절하고 있음 ({other})"

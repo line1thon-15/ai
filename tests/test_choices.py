@@ -235,3 +235,14 @@ def test_templates_share_the_same_format(texts):
 def test_normalize_choice_reads_naturally(raw, expected):
     from app.choices import normalize_choice
     assert normalize_choice(raw) == expected
+
+
+
+
+@pytest.mark.parametrize("correct,ok", [
+    ("갑자기 부모님과 오라니 좀 이상해요.", False),     # 실제 Gemini 출력: 어른 단어만 있음
+    ("이상해요. 부모님께 먼저 말씀드릴게요.", True),     # 어른에게 알림
+    ("선생님한테 물어볼게요. 지금은 안 할래요.", True),
+])
+def test_correct_with_adult_needs_telling(correct, ok):
+    assert (choice_problem({**GOOD, "correct": correct}) is None) is ok

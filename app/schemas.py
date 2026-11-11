@@ -67,7 +67,7 @@ class Variant(BaseModel):
     child_setup: str = Field(min_length=1, max_length=300)
     opening_line: str = Field(min_length=1, max_length=200)
     ai_role: AiRole
-    clues: list[ClueVariant] = Field(min_length=1, max_length=10)
+    clues: list[ClueVariant] = Field(default_factory=list, max_length=10)  # 정상 상황 변형은 빈 목록
 
 
 class VariantRequest(BaseModel):
@@ -76,6 +76,22 @@ class VariantRequest(BaseModel):
     platform: str | None = None
     tone: str | None = None
     context: str | None = None
+    # T-32: platform 을 비우고 자주 쓰는 앱을 주면, 앱에 맞는 플랫폼을 먼저 고른다
+    favorite_apps: list[str] = Field(default_factory=list, max_length=10)
+
+
+# ---- T-32 진단 결과·자주 쓰는 앱 --------------------------------------------------
+
+class SetupRequest(BaseModel):
+    favorite_apps: list[str] = Field(default_factory=list, max_length=10)
+    # 진단 3문항 중 위험한 답 개수 (백엔드가 셈). 모르면 null → 쉬운 단계부터
+    diagnosis_risky_count: int | None = Field(default=None, ge=0, le=3)
+
+
+class SetupResponse(BaseModel):
+    start_difficulty: Literal[1, 2]  # 시나리오의 difficulty 와 같은 값
+    preferred_platforms: list[str]  # 변형 생성에 쓸 플랫폼, 앞이 우선
+    unknown_apps: list[str]  # 규칙에 없는 앱 이름 (content/setup.json 에 추가하면 됨)
 
 
 class VariantResponse(BaseModel):
@@ -86,6 +102,7 @@ class VariantResponse(BaseModel):
 class StartRequest(BaseModel):
     scenario_id: str = Field(min_length=1, max_length=64)
     variant: Variant | None = None  # T-13 변형을 쓸 때 /practice/variant 응답을 그대로 보낸다
+    hint_level: int = Field(default=0, ge=0, le=3)  # T-74: 0 없음 / 1 약함 / 2 중간 / 3 강함 (백엔드가 정함)
 
 
 class StartResponse(BaseModel):
@@ -98,6 +115,7 @@ class StartResponse(BaseModel):
     target_clue_id: str | None  # 선택지가 다루는 단서
     choices: list[Choice]  # 정답·의심·다른 답 3개 (순서 섞음)
     choices_source: Literal["model", "template", "none"]
+    hint: str | None = None  # hint_level 을 보냈을 때만
 
 
 class TurnRequest(BaseModel):
@@ -106,6 +124,7 @@ class TurnRequest(BaseModel):
     # 백엔드가 지금까지 드러난 단서를 알려 주면 반복하지 않는다 (선택)
     revealed_clue_ids: list[str] = Field(default_factory=list, max_length=20)
     variant: Variant | None = None
+    hint_level: int = Field(default=0, ge=0, le=3)
 
     @field_validator("messages")
     @classmethod
@@ -125,6 +144,7 @@ class TurnResponse(BaseModel):
     choices_source: Literal["model", "template", "none"]
     masked: bool  # 아이의 글에서 개인정보를 가렸는지
     source: Literal["model", "fallback", "fixed"]
+    hint: str | None = None  # hint_level 을 보냈을 때만 (safe_reply 이면 없음)
 
 
 # ---- T-14 단서 판별 + 피드백 -----------------------------------------------------
@@ -156,6 +176,8 @@ class JudgeResponse(BaseModel):
 class FeedbackRequest(BaseModel):
     scenario_id: str = Field(min_length=1, max_length=64)
     results: list[ClueResult] = Field(default_factory=list, max_length=20)  # 정상 상황은 빈 목록
+    # T-34: 정상 상황이면 judge 의 normal_outcome 을 그대로 보내면 판정 문구(normal_feedback)를 만든다
+    normal_outcome: Literal["trusted_correctly", "over_warned"] | None = None
     messages: list[Message] = Field(default_factory=list, max_length=40)  # 선택: 아이 말에 맞춘 피드백용
     variant: Variant | None = None
 
@@ -170,3 +192,21 @@ class FeedbackResponse(BaseModel):
     cards: list[FeedbackCard]  # found/missed 단서만, 요청 순서대로
     closing_line: str
     source: Literal["model", "fallback", "mixed", "fixed"]  # mixed: 일부 카드는 고정 문장
+    normal_feedback: str | None = None  # T-34: 정상 상황 판정 문구 (위험 상황은 null)
+
+
+# ---- T-78 심화 연습 피드백 -------------------------------------------------------
+
+class DeepFeedbackRequest(BaseModel):
+    scenario_id: str = Field(min_length=1, max_length=64)
+    answer: str = Field(min_length=1, max_length=500)  # 아이가 쓴(또는 말로 해서 글자로 바꾼) 판단 이유
+    question: str | None = Field(default=None, max_length=200)  # 화면에서 아이에게 한 질문 (선택)
+    clue_ids: list[str] = Field(default_factory=list, max_length=20)  # 이번 연습에서 드러난 단서 (비우면 시나리오 전체)
+    variant: Variant | None = None
+
+
+class DeepFeedbackResponse(BaseModel):
+    status: Literal["ok", "safe_reply", "blocked"]  # safe_reply 이면 연습을 멈출 것
+    feedback: list[str]  # 1~3문장, 점수 없음
+    masked: bool  # 아이의 글에서 개인정보를 가렸는지
+    source: Literal["model", "fallback", "fixed"]

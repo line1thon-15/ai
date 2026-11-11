@@ -16,6 +16,7 @@ from .content import load_all_scenarios
 from .jsonutil import clean_text, parse_json_object
 from .providers import LLMProvider, QuotaExceeded
 from .scenarios import CLUE_DEFS, InvalidVariant, base_as_variant, check_variant, get_base
+from .setup import platforms_for_apps
 from .schemas import AiRole, ClueVariant, Variant, VariantRequest, VariantResponse
 
 MAX_ATTEMPTS = 2
@@ -44,8 +45,6 @@ class Variator:
 
     def generate(self, req: VariantRequest) -> VariantResponse:
         base = get_base(self.scenarios, req.scenario_id)
-        if base.get("kind") == "normal":  # 정상 상황은 변형하지 않는다
-            raise InvalidVariant(req.scenario_id)
         axes = base["variation_axes"]
         for field in ("platform", "tone", "context"):
             value = getattr(req, field)
@@ -53,11 +52,20 @@ class Variator:
                 raise InvalidAxis(field)
 
         other_platforms = [p for p in axes["platform"] if p != base["platform"]] or axes["platform"]
-        platform = req.platform or self.rng.choice(other_platforms)
+        # T-32: 자주 쓰는 앱에 맞는 플랫폼이 이 시나리오에서 가능하면 그걸 먼저 쓴다
+        preferred = [p for p in platforms_for_apps(req.favorite_apps)[0] if p in axes["platform"]]
+        platform = req.platform or (preferred[0] if preferred else self.rng.choice(other_platforms))
         tone = req.tone or self.rng.choice(axes["tone"])
         context = req.context or self.rng.choice(axes["context"])
+        if base.get("kind") == "normal":
+            # T-34: 정상 상황은 '믿을 수 있는 경로'가 안심 신호의 일부라 플랫폼을 바꾸지 않는다
+            # (예: 아는 사람 소개 → 오픈채팅의 모르는 사람이 되면 위험 상황과 같아진다). 말투만 바꾼다.
+            if req.platform is not None and req.platform != base["platform"]:
+                raise InvalidAxis("platform")
+            platform, context = base["platform"], base["title"]
 
-        prompt = build_prompt(base, platform, tone, context)
+        prompt = (build_normal_prompt(base, platform, tone, context) if base.get("kind") == "normal"
+                  else build_prompt(base, platform, tone, context))
         for _ in range(MAX_ATTEMPTS):
             try:
                 raw = self.provider.generate(prompt, json_mode=True)
@@ -108,12 +116,42 @@ def build_prompt(base: dict, platform: str, tone: str, context: str) -> str:
     return "\n".join(lines)
 
 
+def build_normal_prompt(base: dict, platform: str, tone: str, context: str) -> str:
+    """T-34 정상 상황 생성: 위험 신호 없이, 안심 신호는 그대로 두고 겉모습만 바꾼다."""
+    lines = [
+        "너는 경계선 지능 청소년의 생활 판단 연습 서비스에서, 연습 상황을 새로 바꿔 쓰는 작가야.",
+        "아래는 위험하지 않은 '정상 상황'이야. 안심할 수 있는 점은 그대로 두고, 겉모습만 바꿔서 새 상황을 써.",
+        "",
+        f"[플랫폼] {PLATFORM_NAMES.get(platform, platform)} (바꾸지 마)",
+        f"[바꿀 말투] {tone}",
+        "",
+        "[원본 상황]",
+        f"- 제목: {base['title']}",
+        f"- 상황 설명: {base['child_setup']}",
+        f"- 상대 역할: {base['ai_role']['name']} — {base['ai_role']['persona']}",
+        f"- 첫 대사: {base['opening_line']}",
+        "- 안심 신호 (꼭 남길 것): " + ", ".join(base.get("safe_signals", [])),
+        "- 상대는 아는 사람이거나 믿을 수 있는 곳(가게, 학교, 기관)이어야 해. "
+        "모르는 사람이 먼저 연락하는 상황(오픈채팅, 모르는 계정의 쪽지 등)으로 바꾸지 마.",
+        "",
+        "[규칙]",
+        "- 돈을 먼저 내라, 계좌·비밀번호·신분증을 달라, 비밀로 해라, 링크를 눌러라, 빨리 정해라 같은 말은 절대 넣지 마.",
+        "- 모든 글은 쉬운 말로, 첫 대사는 1~2문장으로 써.",
+        "- 실제 회사, 기관, 사람 이름은 쓰지 마.",
+        "",
+        "출력은 아래 JSON 한 개만 써. 다른 글은 쓰지 마.",
+        '{"title": "새 제목", "child_setup": "아이에게 보여 줄 상황 설명 1~2문장", '
+        '"ai_role": {"name": "상대 역할 이름", "persona": "성격 한 문장"}, "opening_line": "첫 대사"}',
+    ]
+    return "\n".join(lines)
+
+
 def to_variant(raw: str, base: dict, platform: str, tone: str, context: str) -> Variant | None:
     data = parse_json_object(raw)
     if data is None:
         return None
     try:
-        lines = {c["id"]: clean_text(c["reveal_line"]) for c in data["clues"] if isinstance(c, dict)}
+        lines = {c["id"]: clean_text(c["reveal_line"]) for c in data.get("clues") or [] if isinstance(c, dict)}
         variant = Variant(
             base_scenario_id=base["id"],
             platform=platform,

@@ -78,11 +78,76 @@ def test_normal_turn_fallback():
     assert {c.text for c in r.choices} == set(NORMAL_GENERIC.values())
 
 
-def test_normal_has_no_variant():
-    with pytest.raises(InvalidVariant):
-        Variator(FakeProvider()).generate(VariantRequest(scenario_id=NID))
+# ---- T-34 정상 상황 생성 ------------------------------------------------------
+
+NORMAL_VARIANT = {"title": "학교 앞 분식집 주말 알바", "child_setup": "친구 소개로 학교 앞 분식집 사장님이 주말 알바를 제안해요.",
+                  "ai_role": {"name": "분식집 사장님", "persona": "친절하고 차분한 사장님. 부모님과 함께 오라고 한다."},
+                  "opening_line": "안녕하세요, 주말에 가게 일을 도와줄 사람을 찾고 있어요. 부모님과 같이 가게에 와서 이야기해요."}
+
+
+def test_normal_variant_from_model():
+    r = Variator(FakeProvider(json.dumps(NORMAL_VARIANT, ensure_ascii=False))).generate(
+        VariantRequest(scenario_id=NID))
+    assert r.source == "model" and r.variant.clues == [] and r.variant.title == NORMAL_VARIANT["title"]
+    assert r.variant.platform == SCENARIOS[NID]["platform"]  # 원래 플랫폼 유지
+    s = PracticeEngine(FakeProvider()).start(NID, r.variant)
+    assert s.reply == NORMAL_VARIANT["opening_line"] and s.revealed_clue_ids == []
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("opening_line", "주말 알바예요. 먼저 교육비를 입금해 주세요."),
+    ("opening_line", "오늘까지만 뽑아요. 빨리 정해요."),
+    ("child_setup", "사장님이 비밀로 하라고 해요."),
+])
+def test_normal_variant_with_risk_falls_back(field, bad):
+    r = Variator(FakeProvider(json.dumps({**NORMAL_VARIANT, field: bad}, ensure_ascii=False))).generate(
+        VariantRequest(scenario_id=NID))
+    assert r.source == "fallback" and r.variant.opening_line == SCENARIOS[NID]["opening_line"]
+
+
+@pytest.mark.parametrize("nid", NORMAL_IDS)
+def test_normal_originals_pass_their_own_check(nid):
+    """대체용 원본이 검사에 걸리면 안 된다 (예: '비밀번호를 절대 묻지 않아요')."""
+    from app.scenarios import check_variant
+    assert check_variant(SCENARIOS[nid], base_as_variant(SCENARIOS[nid])) == []
+
+
+def test_risk_variant_cannot_be_used_for_normal():
     with pytest.raises(InvalidVariant):
         PracticeEngine(FakeProvider()).start(NID, base_as_variant(SCENARIOS[SID]))
+
+
+# ---- T-34 정상 상황 판정 문구 ---------------------------------------------------
+
+@pytest.mark.parametrize("outcome", ["trusted_correctly", "over_warned"])
+def test_normal_feedback_fallback(outcome):
+    from app.judge import normal_template
+    from app.schemas import FeedbackRequest
+    r = Judge(Boom()).feedback(FeedbackRequest(scenario_id=NID, normal_outcome=outcome))
+    assert r.source == "fallback" and r.normal_feedback == normal_template(SCENARIOS[NID], outcome)
+    assert "직접 만나서 이야기해요" in r.normal_feedback
+
+
+def test_normal_feedback_from_model():
+    from app.schemas import FeedbackRequest
+    text = "카페 사장님이 부모님과 함께 오라고 한 걸 잘 봤어요. 믿어도 되는 상황을 잘 알아봤어요."
+    p = FakeProvider(json.dumps({"feedback": text}, ensure_ascii=False))
+    r = Judge(p).feedback(FeedbackRequest(scenario_id=NID, normal_outcome="trusted_correctly"))
+    assert r.source == "model" and r.normal_feedback == text and "지나치게" not in p.last_prompt.split("[결과]")[1][:40]
+
+
+def test_normal_feedback_blame_rejected():
+    from app.schemas import FeedbackRequest
+    p = FakeProvider(json.dumps({"feedback": "그것도 모르니? 바보 같아요."}, ensure_ascii=False))
+    r = Judge(p).feedback(FeedbackRequest(scenario_id=NID, normal_outcome="over_warned"))
+    assert r.source == "fallback" and "바보" not in r.normal_feedback
+
+
+@pytest.mark.parametrize("nid", NORMAL_IDS)
+def test_normal_templates_pass_filter(nid):
+    from app.judge import feedback_problem, normal_template
+    for outcome in ("trusted_correctly", "over_warned"):
+        assert feedback_problem(normal_template(SCENARIOS[nid], outcome)) is None
 
 
 # ---- 정상 상황: 판정 -----------------------------------------------------------
@@ -163,3 +228,23 @@ def test_shorten_drops_leading_connective_when_first_sentence_removed():
     assert shorten(full, ["urgency"]) == "저희가 오늘까지만 사람을 뽑고 있거든요. 지금 바로 시작할 수 있는지 알려주셔야 해요!"
     # 첫 문장을 남기면 접속어는 그대로
     assert shorten("그런데 오늘만 해요. 둘이에요. 셋이에요.", ["urgency"]) == "그런데 오늘만 해요. 둘이에요."
+
+
+
+# ---- Gemini 확인 결과 반영 (2026-11-12) -----------------------------------------
+
+def test_normal_variant_cannot_move_to_stranger_platform():
+    """'아는 사람 소개'가 '오픈채팅의 모르는 사람'이 되면 위험 상황과 같아진다."""
+    from app.variation import InvalidAxis
+    with pytest.raises(InvalidAxis):
+        Variator(FakeProvider("x")).generate(VariantRequest(scenario_id=NID, platform="open_chat"))
+    p = FakeProvider("x")
+    Variator(p).generate(VariantRequest(scenario_id=NID, favorite_apps=["인스타"]))
+    assert "아는 사람의 소개" in p.last_prompt and "바꾸지 마" in p.last_prompt
+
+
+def test_normal_variant_with_stranger_wording_falls_back():
+    # 실제 Gemini 출력 (2026-11-12 로컬 확인)
+    bad = {**NORMAL_VARIANT, "title": "오픈채팅방에 뜬 알바 모집 글"}
+    r = Variator(FakeProvider(json.dumps(bad, ensure_ascii=False))).generate(VariantRequest(scenario_id=NID))
+    assert r.source == "fallback"
