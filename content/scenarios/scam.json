@@ -1,0 +1,141 @@
+{
+  "version": "v1",
+  "area": "scam",
+  "ai_rules": [
+    "링크는 example.com, 전화번호와 계좌번호는 0으로 채운 값만 쓴다. 진짜처럼 보이는 값을 만들지 않는다.",
+    "아이가 실제 개인정보를 쓰면 받아 적거나 이어 말하지 않고, 연습 안에서 '정보를 보내지 않아요'로 돌린다.",
+    "아이를 비난하거나 평가하지 않는다. 점수, 순위, 진단명 표현을 쓰지 않는다.",
+    "사기 방법을 자세히 가르치지 않는다. 상대 역할은 연습에 필요한 단서만 드러낸다.",
+    "정답을 먼저 알려 주지 않는다. 단서는 정해진 때에 자연스럽게 드러낸다.",
+    "폭력적이거나 성적인 표현, 몸을 해치겠다는 협박은 하지 않는다.",
+    "아이가 자해나 폭력 피해를 말하면 연습을 멈추고 믿는 어른에게 말하도록 안내한다."
+  ],
+  "scenarios": [
+    {
+      "id": "scam_dm_parttime_01",
+      "title": "SNS로 온 쉬운 알바 제안",
+      "platform": "sns_dm",
+      "difficulty": 1,
+      "ai_role": {
+        "name": "알바 모집 담당 '한 매니저'",
+        "persona": "친절하고 말이 빠른 사람. 아이가 망설이면 더 좋은 조건을 말하며 밀어붙인다.",
+        "tone": "다정하지만 재촉하는 말투"
+      },
+      "child_setup": "용돈이 필요해서 알바를 알아보던 아이에게, 모르는 사람이 SNS 쪽지로 알바를 제안해요.",
+      "opening_line": "안녕하세요! 집에서 폰으로 하루 두 시간만 하면 되는 알바예요. 하루에 20만 원 벌 수 있어요. 관심 있으세요?",
+      "clues": [
+        {
+          "id": "too_good_pay",
+          "at_opening": true,
+          "reveal_when": "첫 대사에서 바로",
+          "reveal_line": "하루 두 시간이면 되고, 한 달에 400만 원도 벌 수 있어요."
+        },
+        {
+          "id": "advance_payment",
+          "reveal_when": "아이가 관심을 보이면",
+          "reveal_line": "시작하려면 교육비 3만 원만 먼저 보내 주세요. 일을 시작하면 바로 돌려드려요."
+        },
+        {
+          "id": "urgency",
+          "reveal_when": "아이가 망설이거나 질문을 하면",
+          "reveal_line": "오늘까지만 뽑아요. 지금 바로 정해 주세요."
+        },
+        {
+          "id": "keep_secret",
+          "reveal_when": "아이가 부모님이나 어른 이야기를 하면",
+          "reveal_line": "이 일은 부모님께는 비밀로 해 주세요. 알면 일을 못 하게 돼요."
+        }
+      ],
+      "safe_ending": "아이가 돈을 보내지 않고, 부모님이나 선생님 같은 믿는 어른에게 알려요.",
+      "variation_axes": {
+        "rule": "단서는 그대로 두고 platform, tone, context만 바꾼다",
+        "platform": ["sns_dm", "open_chat", "text_message", "friend_intro"],
+        "tone": ["다정하고 빠른 말투", "정중한 말투", "친구처럼 편한 말투"],
+        "context": ["집에서 폰으로 하는 일", "물건 포장 알바", "설문·후기 작성 알바"]
+      },
+      "normal_situations": [
+        {
+          "id": "normal_cafe_01",
+          "title": "동네 카페 사장님의 알바 제안",
+          "platform": "friend_intro",
+          "summary": "아는 사람의 소개로, 동네 카페 사장님이 주말 알바를 제안해요.",
+          "opening_line": "안녕하세요, 우리 카페에서 주말 알바를 구해요. 친구 소개로 연락드렸어요. 시간 되면 부모님이랑 같이 가게에 와서 이야기해 볼래요?",
+          "safe_signals": ["직접 만나서 이야기해요", "돈을 먼저 내라는 말이 없어요", "부모님과 함께 오라고 해요"],
+          "contrast_clues": ["too_good_pay", "advance_payment", "keep_secret"]
+        },
+        {
+          "id": "normal_center_01",
+          "title": "복지관이 알려 준 청소년 일자리",
+          "platform": "text_message",
+          "summary": "지역 복지관이 청소년 직업 체험 일자리 신청을 안내해요.",
+          "opening_line": "안녕하세요, 지역 복지관이에요. 청소년 직업 체험 일자리 신청을 받고 있어요. 신청서와 보호자 동의서를 가지고 방문해 주세요.",
+          "safe_signals": ["기관 이름이 분명해요", "직접 방문해서 신청해요", "보호자 동의서를 챙기라고 해요"],
+          "contrast_clues": ["suspicious_link", "urgency", "keep_secret"]
+        }
+      ]
+    },
+    {
+      "id": "scam_jobboard_link_01",
+      "title": "채용 공고에서 시작된 링크 알바",
+      "platform": "open_chat",
+      "difficulty": 2,
+      "ai_role": {
+        "name": "채용 담당 '오 팀장'",
+        "persona": "회사 직원처럼 정중하고 서류를 중요하게 말한다. 질문을 받으면 '다들 그렇게 해요'라며 넘어간다.",
+        "tone": "정중하고 사무적인 말투"
+      },
+      "child_setup": "채용 공고를 보고 연락한 아이에게, 담당자가 오픈채팅으로 옮겨서 이야기하자고 해요.",
+      "opening_line": "지원해 주셔서 감사합니다. 간단한 서류 작업만 하시면 바로 근무 가능해요. 아래 링크에서 지원서를 작성해 주세요. (example.com/apply)",
+      "clues": [
+        {
+          "id": "suspicious_link",
+          "at_opening": true,
+          "reveal_when": "첫 대사에서 바로",
+          "reveal_line": "지원서는 이 링크에서만 받아요. 앱도 같이 설치해 주세요. (example.com/apply)"
+        },
+        {
+          "id": "personal_info",
+          "reveal_when": "아이가 링크나 서류에 대해 물으면",
+          "reveal_line": "지원서에 신분증 사진이랑 월급 받을 계좌 번호, 비밀번호까지 같이 적어 주세요."
+        },
+        {
+          "id": "urgency",
+          "reveal_when": "아이가 망설이면",
+          "reveal_line": "오늘 안에 서류를 내야 자리가 남아요. 지금 바로 해 주세요."
+        },
+        {
+          "id": "keep_secret",
+          "reveal_when": "아이가 누군가에게 물어보겠다고 하면",
+          "reveal_line": "회사 내부 일이라서 다른 사람에게는 말하지 말아 주세요."
+        }
+      ],
+      "safe_ending": "아이가 링크를 누르지 않고 정보를 보내지 않으며, 믿는 어른과 함께 확인해요.",
+      "variation_axes": {
+        "rule": "단서는 그대로 두고 platform, tone, context만 바꾼다",
+        "platform": ["job_board", "open_chat", "text_message"],
+        "tone": ["정중하고 사무적인 말투", "친근한 말투"],
+        "context": ["사무 보조 알바", "온라인 상품 등록 알바", "행사 스태프 알바"]
+      },
+      "normal_situations": [
+        {
+          "id": "normal_board_01",
+          "title": "채용 사이트로 한 지원",
+          "platform": "job_board",
+          "summary": "채용 사이트에서 지원한 아이에게 가게가 면접 일정을 안내해요.",
+          "opening_line": "지원해 주셔서 감사합니다. 면접 일정은 이번 주 중에 정해 주세요. 급하지 않으니 부모님과 상의하고 답해 주셔도 돼요.",
+          "safe_signals": ["서두르지 않아요", "상의하고 답하라고 해요", "모르는 링크나 앱이 없어요"],
+          "contrast_clues": ["urgency", "keep_secret", "suspicious_link"]
+        },
+        {
+          "id": "normal_contract_01",
+          "title": "근로계약서를 쓰러 가는 날",
+          "platform": "text_message",
+          "summary": "합격한 가게가 계약서를 같이 쓰자고 안내해요.",
+          "opening_line": "내일 오후 3시에 가게에서 근로계약서를 같이 써요. 이름과 연락처만 적으면 돼요. 보호자 동의서도 필요하니 부모님께 말씀드려 주세요.",
+          "safe_signals": ["직접 만나서 계약서를 써요", "꼭 필요한 정보만 적어요", "부모님께 말하라고 해요"],
+          "contrast_clues": ["personal_info", "keep_secret"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "results": [
+    {
+      "clue_id": "too_good_pay",
+      "result": "missed"
+    },
+    {
+      "clue_id": "advance_payment",
+      "result": "found"
+    },
+    {
+      "clue_id": "urgency",
+      "result": "not_shown"
+    },
+    {
+      "clue_id": "keep_secret",
+      "result": "not_shown"
+    }
+  ],
+  "source": "choices"
+}

@@ -1,0 +1,8 @@
+{
+  "cards": [
+    {"clue_id": "too_good_pay", "result": "missed", "text": "쉬운 일인데 돈을 너무 많이 준다는 말은 위험 신호예요. 너무 좋은 조건은 한 번 더 의심해요."},
+    {"clue_id": "advance_payment", "result": "found", "text": "먼저 돈을 내라는 말이 이상하다고 알아챈 건 정말 잘했어요. 앞으로도 돈은 보내지 말고 어른에게 물어봐요."}
+  ],
+  "closing_line": "오늘도 끝까지 연습해서 멋져요!",
+  "source": "model"
+}
