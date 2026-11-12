@@ -1,0 +1,28 @@
+{
+  "status": "ok",
+  "reply": "안녕하세요, 우리 카페에서 주말 알바를 구해요. 친구 소개로 연락드렸어요. 시간 되면 부모님이랑 같이 가게에 와서 이야기해 볼래요?",
+  "ai_role_name": "동네 카페 사장님",
+  "title": "동네 카페 사장님의 알바 제안",
+  "child_setup": "아는 사람의 소개로, 동네 카페 사장님이 주말 알바를 제안해요.",
+  "revealed_clue_ids": [],
+  "target_clue_id": null,
+  "choices": [
+    {
+      "id": "c1",
+      "text": "좋아요. 그럼 그렇게 할게요.",
+      "kind": "other"
+    },
+    {
+      "id": "c2",
+      "text": "괜찮은 것 같긴 한데, 조금 불안해요.",
+      "kind": "doubtful"
+    },
+    {
+      "id": "c3",
+      "text": "이거 좀 수상해요. 안 할래요.",
+      "kind": "correct"
+    }
+  ],
+  "choices_source": "template",
+  "hint": null
+}

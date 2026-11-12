@@ -1,0 +1,29 @@
+{
+  "scenario_id": "scam_dm_parttime_01",
+  "messages": [
+    {
+      "role": "ai",
+      "text": "안녕하세요! 집에서 폰으로 하루 두 시간만 하면 되는 알바예요. 하루에 20만 원 벌 수 있어요. 관심 있으세요?"
+    },
+    {
+      "role": "child",
+      "text": "와, 좋아요! 바로 할게요.",
+      "choice_kind": "other",
+      "clue_id": "too_good_pay"
+    },
+    {
+      "role": "ai",
+      "text": "시작하려면 교육비 3만 원만 먼저 보내 주세요. 일을 시작하면 그때 돌려드려요."
+    },
+    {
+      "role": "child",
+      "text": "교육비를 먼저 내라니 이상해요. 안 보낼래요.",
+      "choice_kind": "correct",
+      "clue_id": "advance_payment"
+    }
+  ],
+  "revealed_clue_ids": [
+    "too_good_pay",
+    "advance_payment"
+  ]
+}

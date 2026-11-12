@@ -1,0 +1,9 @@
+{
+  "scenario_id": "scam_dm_parttime_01",
+  "question": "왜 그렇게 골랐나요?",
+  "answer": "일하기 전에 돈을 먼저 보내라고 해서 이상하다고 생각했어요.",
+  "clue_ids": [
+    "too_good_pay",
+    "advance_payment"
+  ]
+}
