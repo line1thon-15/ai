@@ -115,3 +115,98 @@ def test_normal_turn_with_home_invite_regenerates():
                                              messages=[Message(role="ai", text=CAFE["opening_line"]),
                                                        Message(role="child", text="어디서 만나요?")]))
     assert res.source == "fallback" and "우리 집" not in res.reply
+
+
+# ---- 백엔드 2차 리뷰: 원본에 같은 단어가 있어도 위험 요구는 막는다 --------------------------------
+from app.scenarios import normal_risk_hits  # noqa: E402
+
+SUPPORT = S["normal_game_support_01"]  # 원본: '고객센터는 비밀번호를 절대 묻지 않아요'
+MARKET = S["normal_game_market_01"]  # 원본: '게임 안 공식 거래소에 올려 둘게'
+
+
+def _variant_of(base, opening, child_setup=None):
+    v = base_as_variant(base).model_dump()
+    v["opening_line"] = opening
+    if child_setup:
+        v["child_setup"] = child_setup
+    from app.schemas import Variant
+    return Variant(**v)
+
+
+@pytest.mark.parametrize("text", [
+    "고객센터는 비밀번호를 절대 묻지 않아요.",
+    "비밀번호는 누구에게도 알려 주지 마세요.",
+    "돈을 먼저 보낼 필요는 없어요.",
+    "빨리 정하지 않아도 돼요.",
+])
+def test_safety_notices_allowed(text):
+    assert normal_risk_hits(text) == []
+
+
+@pytest.mark.parametrize("text", [
+    "본인 확인을 위해 비밀번호를 알려 주세요.",
+    "고객센터는 비밀번호를 묻지 않지만, 이번에는 비밀번호를 알려 주세요.",
+    "비밀번호를 알려 주지 않으면 계정이 정지돼요.",
+    "비밀번호 알려 주면 안 돼?",
+    "거래소 말고 내 계좌로 먼저 송금해 줘.",
+    "아이템은 선입금하면 바로 보내 줄게.",
+])
+def test_risky_requests_rejected(text):
+    assert normal_risk_hits(text)
+
+
+def test_support_variant_asking_password_rejected():
+    # 사례 1: 비밀번호를 묻지 않던 상황에서 비밀번호를 요구
+    bad = _variant_of(SUPPORT, "안녕하세요, 게임 고객센터예요. 확인을 위해 비밀번호를 알려 주세요. 문의는 게임 안 메뉴에 남겨 주세요.")
+    assert any(p.startswith("risk_phrase") for p in check_variant(SUPPORT, bad))
+
+
+def test_support_variant_asking_password_falls_back():
+    data = {"title": SUPPORT["title"], "child_setup": SUPPORT["child_setup"],
+            "ai_role": {"name": SUPPORT["ai_role"]["name"], "persona": SUPPORT["ai_role"]["persona"]},
+            "opening_line": "게임 고객센터예요. 계정 확인을 위해 비밀번호를 알려 주세요. 게임 안 메뉴에서 확인할게요."}
+    res = Variator(FakeProvider(json.dumps(data, ensure_ascii=False)), S).generate(
+        VariantRequest(scenario_id="normal_game_support_01"))
+    assert res.source == "fallback" and res.variant.opening_line == SUPPORT["opening_line"]
+
+
+def test_market_variant_turned_into_transfer_rejected():
+    # 사례 2: 공식 거래소 안내가 개인 송금·선입금 요구로 바뀜
+    bad = _variant_of(MARKET, "그 아이템 거래소 말고 내 계좌로 먼저 송금해 주면 보내 줄게. 천천히 생각해 봐.")
+    assert any(p.startswith("risk_phrase") for p in check_variant(MARKET, bad))
+    bad2 = _variant_of(MARKET, "거래소에 올리기 전에 선입금해 주면 너한테만 싸게 줄게. 천천히 생각해 봐.")
+    assert any(p.startswith("risk_phrase") for p in check_variant(MARKET, bad2))
+
+
+@pytest.mark.parametrize("nid,reply", [
+    ("normal_game_support_01", "확인해 볼게요. 계정 확인을 위해 비밀번호를 알려 주세요."),
+    ("normal_game_market_01", "거래소는 수수료가 있으니 그냥 내 계좌로 송금해 줘."),
+    ("normal_cafe_01", "좋아요. 그럼 보증금 먼저 입금해 주면 바로 일할 수 있어요."),
+])
+def test_normal_turn_with_new_risk_request_falls_back(nid, reply):
+    # 사례 3: 정상 상황의 다음 턴에 새로운 위험 요구
+    s = S[nid]
+    raw = json.dumps({"reply": reply, "choices": {"correct": "a.", "doubtful": "b.", "other": "c."}}, ensure_ascii=False)
+    p = FakeProvider(raw)
+    res = PracticeEngine(p).turn(TurnRequest(scenario_id=nid, messages=[
+        Message(role="ai", text=s["opening_line"]), Message(role="child", text="어떻게 하면 돼요?")]))
+    assert res.source == "fallback" and normal_risk_hits(res.reply) == []
+    assert p.calls == 2  # 1번 다시 만들어 보고 고정 대사로
+
+
+def test_normal_turn_safety_notice_kept():
+    s = SUPPORT
+    raw = json.dumps({"reply": "걱정 마세요. 고객센터는 비밀번호를 절대 묻지 않아요.",
+                      "choices": {"correct": "이건 좀 이상해서 안 할래요.", "doubtful": "괜찮은 것 같긴 한데 불안해요.",
+                                  "other": "네, 메뉴에 문의를 남길게요."}}, ensure_ascii=False)
+    res = PracticeEngine(FakeProvider(raw)).turn(TurnRequest(scenario_id="normal_game_support_01", messages=[
+        Message(role="ai", text=s["opening_line"]), Message(role="child", text="비밀번호 알려 줘야 해요?")]))
+    assert res.source == "model"
+
+
+@pytest.mark.parametrize("nid", [k for k, s in S.items() if s.get("kind") == "normal"])
+def test_original_normal_texts_have_no_risk_request(nid):
+    from app.practice import NORMAL_FALLBACK
+    s = S[nid]
+    for text in (s["title"], s["child_setup"], s["opening_line"], s["ai_role"]["persona"], NORMAL_FALLBACK):
+        assert normal_risk_hits(text) == [], text

@@ -1,4 +1,6 @@
 """시나리오 찾기 + T-13 변형 검증. 연습·판별·피드백이 모두 같은 규칙으로 시나리오를 고른다."""
+import re
+
 from .content import load_clues
 from .safety import check_output
 from .schemas import ClueVariant, AiRole, Variant
@@ -37,12 +39,35 @@ NORMAL_RISK_PHRASES = (
 STRANGER_PHRASES = ("모르는 사람", "낯선 사람", "모르는 계정", "처음 보는 사람", "오픈채팅")
 
 
+# 위험 단어 뒤에서 부정하면 '안전 안내'로 본다 ('고객센터는 비밀번호를 절대 묻지 않아요', '돈을 먼저 낼 필요 없어요')
+_NEGATION = ("않", "없", "마세요", "말아", "금지")
+# 부정처럼 보여도 실제로는 요구·협박인 표현 ('비밀번호를 알려 주지 않으면 계정이 막혀요')
+_THREAT = ("않으면", "없으면", "안 하면", "안 그러면", "안 주면", "안 보내면")
+_SENTENCE_END = re.compile(r"[.!?。\n]")
+
+
+def _is_safety_notice(tail: str) -> bool:
+    """위험 단어 뒤 같은 문장 안의 글(tail)이 그 단어를 부정하는 안내인지."""
+    if any(w in tail for w in _THREAT):
+        return False
+    if any(w in tail for w in _NEGATION):
+        return True
+    # '알려 주면 안 돼요'는 안내, '알려 주면 안 돼?'는 묻는 말이라 요구로 본다
+    return ("안 돼" in tail or "안 되" in tail) and not tail.rstrip().endswith("?")
+
+
 def _risky_use(text: str, phrase: str) -> bool:
-    """'비밀번호는 묻지 않아요'처럼 바로 뒤에서 부정하면 위험 표현으로 보지 않는다."""
+    """위험 단어가 한 번이라도 '안전 안내'가 아닌 뜻으로 쓰였는지. 같은 단어가 여러 번 나오면 하나씩 본다."""
     start = text.find(phrase)
     while start != -1:
-        tail = text[start + len(phrase):start + len(phrase) + 10]
-        if "않" not in tail and "없" not in tail:
+        rest = text[start + len(phrase):]
+        end = _SENTENCE_END.search(rest)
+        tail = rest[:end.end()] if end else rest
+        # 다음에 같은 단어가 또 나오면 거기까지만 본다 ('묻지 않지만, 비밀번호를 알려 주세요')
+        nxt = tail.find(phrase)
+        if nxt != -1:
+            tail = tail[:nxt]
+        if not _is_safety_notice(tail):
             return True
         start = text.find(phrase, start + 1)
     return False
@@ -53,10 +78,11 @@ def normal_base_text(base: dict) -> str:
                      base["ai_role"]["persona"], base.get("summary", "")])
 
 
-def normal_risk_hits(text: str, base: dict) -> list[str]:
-    """정상 상황 글에 새로 들어온 위험 표현 (원본에 이미 있는 표현은 허용)."""
-    base_text = normal_base_text(base)
-    return [w for w in NORMAL_RISK_PHRASES if w not in base_text and _risky_use(text, w)]
+def normal_risk_hits(text: str, base: dict | None = None) -> list[str]:
+    """정상 상황 글(변형·대사·판정 문구)에 들어간 위험 요구.
+    원본에 같은 단어가 있어도 허용하지 않는다. 단어 뒤에서 부정하는 안전 안내만 허용한다
+    (백엔드 리뷰: 원본의 '비밀번호를 묻지 않아요' 때문에 '비밀번호를 알려 주세요'가 통과하면 안 됨)."""
+    return [w for w in NORMAL_RISK_PHRASES if _risky_use(text, w)]
 
 
 def missing_keep(base: dict, text: str) -> list[str]:
@@ -80,7 +106,7 @@ def check_normal_variant(base: dict, v: Variant) -> list[str]:
         problems.append("platform")
     if v.clues:
         problems.append("clue_ids")
-    # 원본에 이미 있는 표현은 허용 (예: "고객센터는 비밀번호를 절대 묻지 않아요")
+    # 원본에 같은 단어가 있어도 허용하지 않는다. '비밀번호를 절대 묻지 않아요'처럼 부정하는 안내만 허용
     for name, text in [("opening_line", v.opening_line), ("child_setup", v.child_setup), ("title", v.title),
                        ("ai_role", v.ai_role.name + " " + v.ai_role.persona)]:
         if not check_output(text, "roleplay").allowed:
