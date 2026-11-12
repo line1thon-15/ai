@@ -212,6 +212,63 @@ def test_original_normal_texts_have_no_risk_request(nid):
         assert normal_risk_hits(text) == [], text
 
 
+@pytest.mark.parametrize("nid", [k for k, s in S.items() if s.get("kind") == "normal"])
+def test_normal_fallback_line_fits_situation(nid):
+    """T-29: 모델이 실패하면 정상 상황마다 정한 고정 대사를 쓴다 (친구 사이는 반말 등)."""
+    s = S[nid]
+    p = FakeProvider("not json")
+    res = PracticeEngine(p).turn(TurnRequest(scenario_id=nid, messages=[
+        Message(role="ai", text=s["opening_line"]), Message(role="child", text="음, 잘 모르겠어요.")]))
+    assert res.source == "fallback" and res.reply == (s.get("fallback_line") or res.reply)
+    assert normal_risk_hits(res.reply) == []
+
+
+# ---- T-29: 첫 대사에 단서가 없는 시나리오 -----------------------------------------------
+@pytest.mark.parametrize("sid", [k for k, s in S.items()
+                                 if s.get("kind") == "risk" and s["area"] in ("identity_lending", "friend_pressure")])
+def test_start_without_opening_clue_uses_opening_choices(sid):
+    s = S[sid]
+    r = PracticeEngine(FakeProvider("x")).start(sid)
+    assert r.revealed_clue_ids == [] and r.target_clue_id is None
+    assert {c.kind: c.text for c in r.choices} == s["opening_choices"]
+    # 첫 턴에서는 첫 번째 단서가 드러난다 (모델이 실패해도 고정 대사로)
+    t = PracticeEngine(FakeProvider("not json")).turn(TurnRequest(scenario_id=sid, messages=[
+        Message(role="ai", text=s["opening_line"]), Message(role="child", text=s["opening_choices"]["correct"])]))
+    assert t.revealed_clue_ids == [s["clues"][0]["id"]]
+
+
+def test_variant_opening_must_not_leak_first_clue():
+    s = S["identity_phone_senior_01"]
+    v = base_as_variant(s).model_dump()
+    v["opening_line"] = "야, 네 이름으로 휴대폰 하나만 개통해 줘."
+    from app.schemas import Variant
+    assert any(p.startswith("opening_leak:lend_identity") for p in check_variant(s, Variant(**v)))
+    assert check_variant(s, base_as_variant(s)) == []
+
+
+# ---- T-29 검수 v2: 아이의 말에 맞는 단서로 이어 가기 (모델이 실패했을 때도) --------------------
+@pytest.mark.parametrize("child,expected", [
+    ("부모님께 먼저 물어볼게요.", "keep_secret"),
+    ("그거 위험한 거 아니에요?", "no_risk_claim"),
+    ("좀 생각해 볼게요.", "urgency"),
+    ("음.", "lend_identity"),  # 맞는 단서가 없으면 시나리오 순서대로
+])
+def test_fallback_follows_child_reaction(child, expected):
+    s = S["identity_phone_senior_01"]  # 단서: lend_identity, too_good_pay, no_risk_claim, keep_secret
+    sid = "identity_dm_account_01" if expected == "urgency" else "identity_phone_senior_01"
+    s = S[sid]
+    t = PracticeEngine(FakeProvider("not json")).turn(TurnRequest(scenario_id=sid, messages=[
+        Message(role="ai", text=s["opening_line"]), Message(role="child", text=child)]))
+    first = s["clues"][0]["id"]
+    assert t.source == "fallback" and t.revealed_clue_ids == [expected if child != "음." else first]
+
+
+def test_every_clue_has_triggers():
+    from app.content import load_clues
+    for c in load_clues()["clues"]:
+        assert c.get("triggers"), c["id"]
+
+
 # ---- 백엔드 3차 리뷰: 뒤에 붙은 '마세요' 같은 다른 부정 때문에 요구가 통과하면 안 된다 ----------------
 BYPASS = [
     "비밀번호를 알려 주세요, 잊지 마세요.",

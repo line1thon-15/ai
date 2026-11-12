@@ -28,6 +28,7 @@ PLATFORM_NAMES = {
     "job_board": "채용 사이트 공고",
     "game_chat": "게임 속 채팅(귓속말)",
     "school_notice": "학교 알림장",
+    "messenger": "메신저 대화(아는 친구)",
 }
 
 
@@ -97,6 +98,8 @@ def build_prompt(base: dict, platform: str, tone: str, context: str) -> str:
         d = CLUE_DEFS[c["id"]]
         opening = " (첫 대사에도 반드시 드러나야 함)" if c.get("at_opening") else ""
         lines.append(f"- {c['id']}: {d['description']}{opening} / 원본 대사: {c['reveal_line']}")
+    if not any(c.get("at_opening") for c in base["clues"]):
+        lines.append("- 첫 대사는 인사와 부탁의 시작만 써. 위 단서는 첫 대사에 넣지 말고, 정해진 때에 하나씩 드러나게 해.")
     lines += ["", "[규칙]"]
     lines += [f"- {r}" for r in base["ai_rules"]]
     lines += [

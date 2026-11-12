@@ -166,6 +166,12 @@ def check_variant(base: dict, v: Variant) -> list[str]:
             problems.append(f"clue_missing:{vc.id}")
         if vc.at_opening and not has_clue_keyword(v.opening_line, vc.id):
             problems.append(f"opening_missing:{vc.id}")
+        # 첫 대사에 단서가 없어야 하는 시나리오: 아직 드러나면 안 되는 단서의 말이 첫 대사에 있으면 안 된다
+        # ('원', '줘'처럼 한 글자 키워드는 흔한 말이라 보지 않는다)
+        if not vc.at_opening and not bc.get("at_opening") and not any(x.get("at_opening") for x in base["clues"]):
+            hits = [k for k in CLUE_DEFS[vc.id].get("keywords", []) if len(k) > 1 and k in v.opening_line]
+            if hits:
+                problems.append(f"opening_leak:{vc.id}")
     for name, text in [("opening_line", v.opening_line), ("child_setup", v.child_setup), ("title", v.title),
                        ("ai_role", v.ai_role.name + " " + v.ai_role.persona),
                        *[(f"reveal_line:{c.id}", c.reveal_line) for c in v.clues]]:

@@ -18,7 +18,7 @@ from .hints import hint_text
 from .jsonutil import clean_text, parse_json_object, split_sentences
 from .providers import LLMProvider, QuotaExceeded
 from .safety import MESSAGES, check_input, check_output, mask_pii
-from .scenarios import InvalidVariant, UnknownScenario, has_clue_keyword, normal_risk_hits, resolve  # noqa: F401
+from .scenarios import CLUE_DEFS, InvalidVariant, UnknownScenario, has_clue_keyword, normal_risk_hits, resolve  # noqa: F401
 from .schemas import StartResponse, TurnRequest, TurnResponse, Variant
 
 # 안내 문구와 전화번호는 content/safety_messages.json 에서 고친다 (팀 확인 필요)
@@ -54,7 +54,9 @@ class PracticeEngine:
             child_setup=s["child_setup"],
             revealed_clue_ids=opening,
             target_clue_id=target,
-            choices=arrange(_templates(s, target)),
+            # 첫 대사에 단서가 없는 시나리오(T-29)는 '무슨 일인지 먼저 듣기'를 연습하는 시작 선택지를 쓴다
+            choices=arrange(dict(s["opening_choices"]) if target is None and s.get("opening_choices")
+                            else _templates(s, target)),
             choices_source="template",
             hint=hint_text(s, target, hint_level),
         )
@@ -107,16 +109,19 @@ class PracticeEngine:
             return _response(s, "ok", reply, revealed + keep, target, validate_texts(choice_data),
                              masked=masked, source="model")
 
-        return self._fallback(s, revealed, latest, masked)
+        return self._fallback(s, revealed, latest, masked, req.messages[-1].text)
 
-    def _fallback(self, s, revealed, latest, masked) -> TurnResponse:
-        """모델이 실패하면 시나리오의 단서 대사를 순서대로 쓴다 (시연이 끊기지 않게)."""
-        if s.get("kind") == "normal":
-            return _response(s, "ok", NORMAL_FALLBACK, [], None, None, masked=masked, source="fallback")
-        for clue in s["clues"]:
-            if clue["id"] not in revealed:
-                return _response(s, "ok", clue["reveal_line"], revealed + [clue["id"]], clue["id"], None,
-                                 masked=masked, source="fallback")
+    def _fallback(self, s, revealed, latest, masked, child_text: str = "") -> TurnResponse:
+        """모델이 실패하면 시나리오의 단서 대사를 쓴다 (시연이 끊기지 않게).
+        아이의 말이 어떤 단서의 '드러낼 때'에 맞으면(triggers) 그 단서를, 아니면 시나리오 순서대로 다음 단서를 쓴다.
+        예: '부모님께 물어볼게요' → 비밀 요구, '위험하지 않아요?' → 안심시키기, '생각해 볼게요' → 재촉."""
+        if s.get("kind") == "normal":  # 정상 상황마다 상황에 맞는 고정 대사가 있으면 그걸 쓴다 (친구 사이 반말 등)
+            return _response(s, "ok", s.get("fallback_line") or NORMAL_FALLBACK, [], None, None, masked=masked,
+                             source="fallback")
+        clue = next_clue(s, revealed, child_text)
+        if clue is not None:
+            return _response(s, "ok", clue["reveal_line"], revealed + [clue["id"]], clue["id"], None,
+                             masked=masked, source="fallback")
         return _response(s, "ok", CLOSING_LINE, revealed, latest, None, masked=masked, source="fallback")
 
     # ---- 프롬프트 ---------------------------------------------------------
@@ -165,7 +170,8 @@ class PracticeEngine:
 
         def clue_line(c: dict) -> str:
             d = self.clue_defs[c["id"]]
-            return f"- {c['id']}: {d['description']} / 드러낼 때: {c['reveal_when']} / 예시 대사: {c['reveal_line']}"
+            return (f"- {c['id']}: {d['description']} / 드러낼 때: {c['reveal_when']}"
+                    f" (아이가 이런 말을 하면: {', '.join(d.get('triggers', [])[:4])}) / 예시 대사: {c['reveal_line']}")
 
         remaining = [c for c in s["clues"] if c["id"] not in revealed]
         done = [c for c in s["clues"] if c["id"] in revealed]
@@ -298,3 +304,13 @@ def _parse(raw: str, valid_ids: list[str]):
     ids = data.get("revealed_clue_ids")
     ids = [i for i in ids if isinstance(i, str) and i in valid_ids] if isinstance(ids, list) else []
     return reply, list(dict.fromkeys(ids)), data.get("choices")
+
+
+def next_clue(s: dict, revealed: list[str], child_text: str = "") -> dict | None:
+    """아직 안 드러난 단서 중 아이의 말에 맞는 것 (없으면 시나리오 순서로 첫 번째)."""
+    remaining = [c for c in s["clues"] if c["id"] not in revealed]
+    for c in remaining:
+        if any(w in child_text for w in CLUE_DEFS[c["id"]].get("triggers", [])):
+            return c
+    return remaining[0] if remaining else None
+

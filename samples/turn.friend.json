@@ -1,0 +1,16 @@
+{
+  "scenario_id": "friend_homework_01",
+  "messages": [
+    {
+      "role": "ai",
+      "text": "야, 내 수학 숙제 좀 대신 해 줘. 너 수학 잘하잖아."
+    },
+    {
+      "role": "child",
+      "text": "나도 숙제 많아서 못 해 줄 것 같아."
+    }
+  ],
+  "revealed_clue_ids": [
+    "burdensome_request"
+  ]
+}
