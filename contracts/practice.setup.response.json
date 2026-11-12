@@ -1,9 +1,0 @@
-{
-  "start_difficulty": 2,
-  "preferred_platforms": [
-    "text_message",
-    "open_chat",
-    "game_chat"
-  ],
-  "unknown_apps": []
-}

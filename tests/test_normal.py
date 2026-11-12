@@ -239,7 +239,7 @@ def test_normal_variant_cannot_move_to_stranger_platform():
     with pytest.raises(InvalidAxis):
         Variator(FakeProvider("x")).generate(VariantRequest(scenario_id=NID, platform="open_chat"))
     p = FakeProvider("x")
-    Variator(p).generate(VariantRequest(scenario_id=NID, favorite_apps=["인스타"]))
+    Variator(p).generate(VariantRequest(scenario_id=NID))
     assert "아는 사람의 소개" in p.last_prompt and "바꾸지 마" in p.last_prompt
 
 

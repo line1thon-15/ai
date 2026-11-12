@@ -18,7 +18,7 @@ from .hints import hint_text
 from .jsonutil import clean_text, parse_json_object, split_sentences
 from .providers import LLMProvider, QuotaExceeded
 from .safety import MESSAGES, check_input, check_output, mask_pii
-from .scenarios import InvalidVariant, UnknownScenario, has_clue_keyword, resolve  # noqa: F401
+from .scenarios import InvalidVariant, UnknownScenario, has_clue_keyword, normal_risk_hits, resolve  # noqa: F401
 from .schemas import StartResponse, TurnRequest, TurnResponse, Variant
 
 # 안내 문구와 전화번호는 content/safety_messages.json 에서 고친다 (팀 확인 필요)
@@ -100,6 +100,8 @@ class PracticeEngine:
             reply = shorten(full_reply, keep, dropped)
             if (reply is None or len(reply) > MAX_REPLY_CHARS or any(has_clue_keyword(reply, d) for d in dropped)
                     or not check_output(reply, "roleplay").allowed):
+                continue
+            if normal and normal_risk_hits(reply, s):  # T-34: 정상 상황 대사에 위험 표현이 섞이면 다시 생성
                 continue
             target = keep[0] if keep else latest
             return _response(s, "ok", reply, revealed + keep, target, validate_texts(choice_data),

@@ -49,30 +49,116 @@
       "safe_ending": "아이가 돈을 보내지 않고, 부모님이나 선생님 같은 믿는 어른에게 알려요.",
       "variation_axes": {
         "rule": "단서는 그대로 두고 platform, tone, context만 바꾼다",
-        "platform": ["sns_dm", "open_chat", "text_message", "friend_intro"],
-        "tone": ["다정하고 빠른 말투", "정중한 말투", "친구처럼 편한 말투"],
-        "context": ["집에서 폰으로 하는 일", "물건 포장 알바", "설문·후기 작성 알바"]
+        "platform": [
+          "sns_dm",
+          "open_chat",
+          "text_message",
+          "friend_intro"
+        ],
+        "tone": [
+          "다정하고 빠른 말투",
+          "정중한 말투",
+          "친구처럼 편한 말투"
+        ],
+        "context": [
+          "집에서 폰으로 하는 일",
+          "물건 포장 알바",
+          "설문·후기 작성 알바"
+        ]
       },
       "normal_situations": [
         {
           "id": "normal_cafe_01",
-          "ai_role": {"name": "동네 카페 사장님", "persona": "친절하고 차분한 동네 카페 사장님. 서두르지 않고, 부모님과 함께 가게에 와서 이야기하자고 한다.", "tone": "친절하고 차분한 말투"},
+          "ai_role": {
+            "name": "동네 카페 사장님",
+            "persona": "친절하고 차분한 동네 카페 사장님. 서두르지 않고, 부모님과 함께 가게에 와서 이야기하자고 한다.",
+            "tone": "친절하고 차분한 말투"
+          },
           "title": "동네 카페 사장님의 알바 제안",
           "platform": "friend_intro",
           "summary": "아는 사람의 소개로, 동네 카페 사장님이 주말 알바를 제안해요.",
           "opening_line": "안녕하세요, 우리 카페에서 주말 알바를 구해요. 친구 소개로 연락드렸어요. 시간 되면 부모님이랑 같이 가게에 와서 이야기해 볼래요?",
-          "safe_signals": ["직접 만나서 이야기해요", "돈을 먼저 내라는 말이 없어요", "부모님과 함께 오라고 해요"],
-          "contrast_clues": ["too_good_pay", "advance_payment", "keep_secret"]
+          "safe_signals": [
+            "직접 만나서 이야기해요",
+            "돈을 먼저 내라는 말이 없어요",
+            "부모님과 함께 오라고 해요"
+          ],
+          "contrast_clues": [
+            "too_good_pay",
+            "advance_payment",
+            "keep_secret"
+          ],
+          "keep": [
+            [
+              "사장님"
+            ],
+            [
+              "알바",
+              "일할",
+              "일을"
+            ]
+          ],
+          "signal_checks": [
+            [
+              "가게",
+              "카페에 와",
+              "카페로 와",
+              "만나",
+              "방문"
+            ],
+            [],
+            [
+              "부모님",
+              "보호자"
+            ]
+          ]
         },
         {
           "id": "normal_center_01",
-          "ai_role": {"name": "지역 복지관 선생님", "persona": "청소년 일자리를 안내하는 복지관 선생님. 신청 방법을 쉽게 알려 주고 보호자와 함께 오라고 한다.", "tone": "다정하고 또박또박한 말투"},
+          "ai_role": {
+            "name": "지역 복지관 선생님",
+            "persona": "청소년 일자리를 안내하는 복지관 선생님. 신청 방법을 쉽게 알려 주고 보호자와 함께 오라고 한다.",
+            "tone": "다정하고 또박또박한 말투"
+          },
           "title": "복지관이 알려 준 청소년 일자리",
           "platform": "text_message",
           "summary": "지역 복지관이 청소년 직업 체험 일자리 신청을 안내해요.",
           "opening_line": "안녕하세요, 지역 복지관이에요. 청소년 직업 체험 일자리 신청을 받고 있어요. 신청서와 보호자 동의서를 가지고 방문해 주세요.",
-          "safe_signals": ["기관 이름이 분명해요", "직접 방문해서 신청해요", "보호자 동의서를 챙기라고 해요"],
-          "contrast_clues": ["suspicious_link", "urgency", "keep_secret"]
+          "safe_signals": [
+            "기관 이름이 분명해요",
+            "직접 방문해서 신청해요",
+            "보호자 동의서를 챙기라고 해요"
+          ],
+          "contrast_clues": [
+            "suspicious_link",
+            "urgency",
+            "keep_secret"
+          ],
+          "keep": [
+            [
+              "복지관",
+              "청소년 센터",
+              "청소년센터",
+              "주민센터",
+              "구청"
+            ]
+          ],
+          "signal_checks": [
+            [
+              "복지관",
+              "센터",
+              "구청"
+            ],
+            [
+              "방문",
+              "와 주세요",
+              "오세요",
+              "찾아와"
+            ],
+            [
+              "동의서"
+            ]
+          ]
         }
       ]
     },
@@ -114,30 +200,113 @@
       "safe_ending": "아이가 링크를 누르지 않고 정보를 보내지 않으며, 믿는 어른과 함께 확인해요.",
       "variation_axes": {
         "rule": "단서는 그대로 두고 platform, tone, context만 바꾼다",
-        "platform": ["job_board", "open_chat", "text_message"],
-        "tone": ["정중하고 사무적인 말투", "친근한 말투"],
-        "context": ["사무 보조 알바", "온라인 상품 등록 알바", "행사 스태프 알바"]
+        "platform": [
+          "job_board",
+          "open_chat",
+          "text_message"
+        ],
+        "tone": [
+          "정중하고 사무적인 말투",
+          "친근한 말투"
+        ],
+        "context": [
+          "사무 보조 알바",
+          "온라인 상품 등록 알바",
+          "행사 스태프 알바"
+        ]
       },
       "normal_situations": [
         {
           "id": "normal_board_01",
-          "ai_role": {"name": "가게 채용 담당자", "persona": "채용 사이트로 지원한 아이에게 면접을 안내하는 담당자. 급하게 정하라고 하지 않는다.", "tone": "정중하고 여유 있는 말투"},
+          "ai_role": {
+            "name": "가게 채용 담당자",
+            "persona": "채용 사이트로 지원한 아이에게 면접을 안내하는 담당자. 급하게 정하라고 하지 않는다.",
+            "tone": "정중하고 여유 있는 말투"
+          },
           "title": "채용 사이트로 한 지원",
           "platform": "job_board",
           "summary": "채용 사이트에서 지원한 아이에게 가게가 면접 일정을 안내해요.",
           "opening_line": "지원해 주셔서 감사합니다. 면접 일정은 이번 주 중에 정해 주세요. 급하지 않으니 부모님과 상의하고 답해 주셔도 돼요.",
-          "safe_signals": ["서두르지 않아요", "상의하고 답하라고 해요", "모르는 링크나 앱이 없어요"],
-          "contrast_clues": ["urgency", "keep_secret", "suspicious_link"]
+          "safe_signals": [
+            "서두르지 않아요",
+            "상의하고 답하라고 해요",
+            "모르는 링크나 앱이 없어요"
+          ],
+          "contrast_clues": [
+            "urgency",
+            "keep_secret",
+            "suspicious_link"
+          ],
+          "keep": [
+            [
+              "지원"
+            ],
+            [
+              "면접"
+            ]
+          ],
+          "signal_checks": [
+            [
+              "급하지 않",
+              "천천히",
+              "편할 때",
+              "서두르지 않",
+              "여유"
+            ],
+            [
+              "상의",
+              "의논",
+              "이야기해 보"
+            ],
+            []
+          ]
         },
         {
           "id": "normal_contract_01",
-          "ai_role": {"name": "가게 사장님", "persona": "합격한 아이와 근로계약서를 쓰려는 사장님. 꼭 필요한 정보만 묻고 부모님께 알리라고 한다.", "tone": "친절하고 분명한 말투"},
+          "ai_role": {
+            "name": "가게 사장님",
+            "persona": "합격한 아이와 근로계약서를 쓰려는 사장님. 꼭 필요한 정보만 묻고 부모님께 알리라고 한다.",
+            "tone": "친절하고 분명한 말투"
+          },
           "title": "근로계약서를 쓰러 가는 날",
           "platform": "text_message",
           "summary": "합격한 가게가 계약서를 같이 쓰자고 안내해요.",
           "opening_line": "내일 오후 3시에 가게에서 근로계약서를 같이 써요. 이름과 연락처만 적으면 돼요. 보호자 동의서도 필요하니 부모님께 말씀드려 주세요.",
-          "safe_signals": ["직접 만나서 계약서를 써요", "꼭 필요한 정보만 적어요", "부모님께 말하라고 해요"],
-          "contrast_clues": ["personal_info", "keep_secret"]
+          "safe_signals": [
+            "직접 만나서 계약서를 써요",
+            "꼭 필요한 정보만 적어요",
+            "부모님께 말하라고 해요"
+          ],
+          "contrast_clues": [
+            "personal_info",
+            "keep_secret"
+          ],
+          "keep": [
+            [
+              "계약서"
+            ],
+            [
+              "가게",
+              "사장님"
+            ]
+          ],
+          "signal_checks": [
+            [
+              "가게에서",
+              "가게로",
+              "만나",
+              "직접",
+              "와서",
+              "오면"
+            ],
+            [
+              "이름"
+            ],
+            [
+              "부모님",
+              "보호자"
+            ]
+          ]
         }
       ]
     },
@@ -216,6 +385,27 @@
             "advance_payment",
             "suspicious_link",
             "urgency"
+          ],
+          "keep": [
+            [
+              "거래소"
+            ],
+            [
+              "게임"
+            ]
+          ],
+          "signal_checks": [
+            [
+              "거래소"
+            ],
+            [],
+            [
+              "천천히",
+              "생각해 봐",
+              "생각해 보고",
+              "급하지 않",
+              "나중에"
+            ]
           ]
         },
         {
@@ -236,6 +426,26 @@
           "contrast_clues": [
             "personal_info",
             "suspicious_link"
+          ],
+          "keep": [
+            [
+              "고객센터"
+            ],
+            [
+              "게임"
+            ]
+          ],
+          "signal_checks": [
+            [
+              "묻지 않",
+              "물어보지 않",
+              "요구하지 않",
+              "달라고 하지 않"
+            ],
+            [
+              "메뉴",
+              "게임 안"
+            ]
           ]
         }
       ]
@@ -315,6 +525,27 @@
             "advance_payment",
             "keep_secret",
             "personal_info"
+          ],
+          "keep": [
+            [
+              "할머니",
+              "할아버지"
+            ],
+            [
+              "용돈"
+            ]
+          ],
+          "signal_checks": [
+            [
+              "할머니",
+              "할아버지"
+            ],
+            [],
+            [
+              "엄마",
+              "아빠",
+              "부모님"
+            ]
           ]
         },
         {
@@ -337,6 +568,28 @@
             "too_good_pay",
             "advance_payment",
             "personal_info"
+          ],
+          "keep": [
+            [
+              "대회",
+              "상품",
+              "상장",
+              "상을"
+            ],
+            [
+              "선생님"
+            ]
+          ],
+          "signal_checks": [
+            [
+              "선생님"
+            ],
+            [
+              "학교에서",
+              "교실에서",
+              "직접"
+            ],
+            []
           ]
         }
       ]

@@ -46,12 +46,17 @@ def test_sources_are_well_formed(clue):
         assert s["org"] and s["title"] and s["evidence"]
         assert s["url"].startswith("https://")
         assert s["strength"] in ("direct", "indirect")
+        # official: 공공기관이 직접 낸 원문 / local_gov: 지자체 홍보물 / press: 언론 보도·기고(2차 인용)
+        assert s["source_type"] in ("official", "local_gov", "press")
+    types = [s["source_type"] for s in clue["sources"]]
+    order = {"official": 0, "local_gov": 1, "press": 2}
+    assert types == sorted(types, key=order.get), "공공기관 원문이 앞에 오도록"
 
 
-def test_scam_clues_all_have_direct_public_sources():
-    """시연 영역(사기)의 단서는 모두 공공기관 직접 근거가 있어야 한다."""
+def test_scam_clues_all_have_direct_official_sources():
+    """시연 영역(사기)의 단서는 모두 공공기관 원문에 직접 근거가 있어야 한다 (언론 보도만으로는 안 됨)."""
     for c in clues_for_area(DATA, "scam"):
-        assert any(s["strength"] == "direct" for s in c["sources"]), c["id"]
+        assert any(s["strength"] == "direct" and s["source_type"] == "official" for s in c["sources"]), c["id"]
 
 
 def test_every_area_has_enough_clues():

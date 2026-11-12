@@ -16,7 +16,6 @@ from .content import load_all_scenarios
 from .jsonutil import clean_text, parse_json_object
 from .providers import LLMProvider, QuotaExceeded
 from .scenarios import CLUE_DEFS, InvalidVariant, base_as_variant, check_variant, get_base
-from .setup import platforms_for_apps
 from .schemas import AiRole, ClueVariant, Variant, VariantRequest, VariantResponse
 
 MAX_ATTEMPTS = 2
@@ -52,9 +51,7 @@ class Variator:
                 raise InvalidAxis(field)
 
         other_platforms = [p for p in axes["platform"] if p != base["platform"]] or axes["platform"]
-        # T-32: 자주 쓰는 앱에 맞는 플랫폼이 이 시나리오에서 가능하면 그걸 먼저 쓴다
-        preferred = [p for p in platforms_for_apps(req.favorite_apps)[0] if p in axes["platform"]]
-        platform = req.platform or (preferred[0] if preferred else self.rng.choice(other_platforms))
+        platform = req.platform or self.rng.choice(other_platforms)
         tone = req.tone or self.rng.choice(axes["tone"])
         context = req.context or self.rng.choice(axes["context"])
         if base.get("kind") == "normal":
@@ -131,8 +128,15 @@ def build_normal_prompt(base: dict, platform: str, tone: str, context: str) -> s
         f"- 상대 역할: {base['ai_role']['name']} — {base['ai_role']['persona']}",
         f"- 첫 대사: {base['opening_line']}",
         "- 안심 신호 (꼭 남길 것): " + ", ".join(base.get("safe_signals", [])),
+        "",
+        "[꼭 지킬 것]",
+        f"- 상대 역할과 관계는 그대로야: {base['ai_role']['name']}. 다른 사람(이웃, 친척, 친구의 형·누나 등)으로 바꾸지 마.",
+        "- 상황의 핵심은 그대로야. 이 말이 글에 들어가야 해: "
+        + ", ".join("/".join(g) for g in base.get("keep", [])),
+        "- 안심 신호는 상황 설명이나 첫 대사에서 아이가 직접 볼 수 있게 써.",
         "- 상대는 아는 사람이거나 믿을 수 있는 곳(가게, 학교, 기관)이어야 해. "
         "모르는 사람이 먼저 연락하는 상황(오픈채팅, 모르는 계정의 쪽지 등)으로 바꾸지 마.",
+        "- 집으로 부르기, 단둘이 만나기, 따로 연락하기처럼 만나는 곳이나 방법을 바꾸지 마.",
         "",
         "[규칙]",
         "- 돈을 먼저 내라, 계좌·비밀번호·신분증을 달라, 비밀로 해라, 링크를 눌러라, 빨리 정해라 같은 말은 절대 넣지 마.",

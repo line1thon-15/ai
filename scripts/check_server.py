@@ -24,7 +24,6 @@ CHECKS = [
     ("첫 대사: 게임 아이템 사기", "POST", "/internal/v1/practice/start", {"scenario_id": "scam_game_item_01"}, "선택지 3개"),
     ("첫 대사: 용돈 이벤트 사기", "POST", "/internal/v1/practice/start", {"scenario_id": "scam_allowance_event_01"}, "선택지 3개"),
     ("첫 대사 + 힌트 2단계", "POST", "/internal/v1/practice/start", "contracts/practice.start.hint.request.json", "hint 문장"),
-    ("진단·앱 반영 (T-32)", "POST", "/internal/v1/practice/setup", "contracts/practice.setup.request.json", "start_difficulty, 플랫폼"),
     ("다음 턴: 알바 사기", "POST", "/internal/v1/practice/turn", "contracts/practice.turn.request.json", "source=model"),
     ("다음 턴: 게임 아이템 사기", "POST", "/internal/v1/practice/turn", "samples/turn.game.json", "source=model, 새 단서 1개"),
     ("다음 턴: 정상 상황", "POST", "/internal/v1/practice/turn", "samples/turn.normal.json", "source=model, 단서 없음"),
@@ -63,8 +62,6 @@ def summarize(body: dict) -> str:
         parts.append(f"선택지 {len(body['choices'])}개")
     if "results" in body:
         parts.append("판별=" + ", ".join(f"{r['clue_id']}:{r['result']}" for r in body["results"]))
-    if "start_difficulty" in body:
-        parts.append(f"start_difficulty={body['start_difficulty']}  플랫폼={body['preferred_platforms']}")
     for key in ("reply", "hint", "summary", "closing_line", "normal_feedback"):
         if body.get(key):
             parts.append(f'\n      {key}: {body[key]}')

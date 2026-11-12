@@ -72,26 +72,11 @@ class Variant(BaseModel):
 
 class VariantRequest(BaseModel):
     scenario_id: str = Field(min_length=1, max_length=64)
-    # 비우면 시나리오의 variation_axes 에서 고른다
+    # 비우면 시나리오의 variation_axes 에서 고른다.
+    # T-32: 진단·자주 쓰는 앱은 백엔드가 플랫폼으로 바꿔서 platform 으로 보낸다 (AI 는 변환·난이도 계산을 하지 않음)
     platform: str | None = None
     tone: str | None = None
     context: str | None = None
-    # T-32: platform 을 비우고 자주 쓰는 앱을 주면, 앱에 맞는 플랫폼을 먼저 고른다
-    favorite_apps: list[str] = Field(default_factory=list, max_length=10)
-
-
-# ---- T-32 진단 결과·자주 쓰는 앱 --------------------------------------------------
-
-class SetupRequest(BaseModel):
-    favorite_apps: list[str] = Field(default_factory=list, max_length=10)
-    # 진단 3문항 중 위험한 답 개수 (백엔드가 셈). 모르면 null → 쉬운 단계부터
-    diagnosis_risky_count: int | None = Field(default=None, ge=0, le=3)
-
-
-class SetupResponse(BaseModel):
-    start_difficulty: Literal[1, 2]  # 시나리오의 difficulty 와 같은 값
-    preferred_platforms: list[str]  # 변형 생성에 쓸 플랫폼, 앞이 우선
-    unknown_apps: list[str]  # 규칙에 없는 앱 이름 (content/setup.json 에 추가하면 됨)
 
 
 class VariantResponse(BaseModel):

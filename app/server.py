@@ -18,9 +18,8 @@ from .judge import Judge
 from .practice import PracticeEngine
 from .providers import LLMProvider
 from .scenarios import InvalidVariant, UnknownScenario
-from .schemas import (DeepFeedbackRequest, FeedbackRequest, JudgeRequest, SetupRequest, StartRequest, SummaryRequest, SummaryResponse,
+from .schemas import (DeepFeedbackRequest, FeedbackRequest, JudgeRequest, StartRequest, SummaryRequest, SummaryResponse,
                       TurnRequest, VariantRequest)
-from .setup import plan as setup_plan
 from .summary import generate_summary
 from .variation import InvalidAxis, Variator
 
@@ -109,11 +108,6 @@ def _practice_variant(app: App, body):
     return _call(VariantRequest, body, app.variator.generate)
 
 
-def _practice_setup(app: App, body):
-    """T-32 진단 결과 → 시작 난이도, 자주 쓰는 앱 → 연습 플랫폼."""
-    return _call(SetupRequest, body, setup_plan)
-
-
 def _practice_deep_feedback(app: App, body):
     """T-78 심화 연습: 아이가 쓴 판단 이유에 피드백 1~3문장 (점수 없음)."""
     return _call(DeepFeedbackRequest, body, app.deep.feedback)
@@ -136,7 +130,6 @@ ROUTES = {
     ("POST", "/internal/v1/practice/start"): (True, _practice_start),
     ("POST", "/internal/v1/practice/turn"): (True, _practice_turn),
     ("POST", "/internal/v1/practice/variant"): (True, _practice_variant),
-    ("POST", "/internal/v1/practice/setup"): (True, _practice_setup),
     ("POST", "/internal/v1/practice/deep/feedback"): (True, _practice_deep_feedback),
     ("POST", "/internal/v1/practice/judge"): (True, _practice_judge),
     ("POST", "/internal/v1/practice/feedback"): (True, _practice_feedback),

@@ -6,8 +6,10 @@
 - 실패하면 단서 내용으로 만든 고정 문장 (source=fallback)
 - 아이의 글은 저장하지 않고, 로그에도 남기지 않는다.
 """
+import re
+
 from .content import load_all_scenarios
-from .jsonutil import clean_text, parse_json_object
+from .jsonutil import clean_text, parse_json_object, split_sentences
 from .judge import feedback_problem, _shorten_feedback  # noqa: F401  (같은 기준을 쓴다)
 from .providers import LLMProvider, QuotaExceeded
 from .safety import MESSAGES, check_input
@@ -18,6 +20,12 @@ MAX_ATTEMPTS = 2
 MAX_SENTENCES = 3
 # 평가처럼 들리는 말은 쓰지 않는다 (점수 없이 문장만)
 JUDGING_WORDS = ("정답", "오답", "틀렸", "틀린", "맞았", "점수", "등급", "만점")
+# 길이: 한 문장은 짧게, 전체도 화면 한 칸에 들어가게 (느린 학습자가 끝까지 읽을 수 있는 길이)
+MAX_SENTENCE_CHARS = 60
+MAX_TOTAL_CHARS = 130
+# 어려운 표현: 법·금융 용어와 범죄 용어. 단서 설명(이름·설명·대처)에 이미 있는 말은 허용한다
+HARD_WORDS = ("보이스피싱", "피싱", "대포통장", "대포폰", "명의도용", "범죄", "처벌", "공범", "수거책", "악성", "자금",
+              "금융거래", "법적", "위법", "불법", "사기범", "편취", "갈취", "도용", "유인", "인증서")
 
 
 def _focus_clues(s: dict, req: DeepFeedbackRequest) -> list[dict]:
@@ -26,12 +34,26 @@ def _focus_clues(s: dict, req: DeepFeedbackRequest) -> list[dict]:
     return [CLUE_DEFS[i] for i in chosen]
 
 
-def sentence_problem(text: str) -> str | None:
+def sentence_problem(text: str, allowed: str = "") -> str | None:
+    """문장 하나의 문제. allowed: 단서 설명처럼 이미 아이에게 보여 준 글 (그 안의 말은 어려운 표현으로 보지 않음)."""
     problem = feedback_problem(text)
     if problem:
         return problem
+    if len(text) > MAX_SENTENCE_CHARS:
+        return f"문장이 김: {len(text)}자"
     hits = [w for w in JUDGING_WORDS if w in text]
-    return f"평가하는 말: {hits[0]}" if hits else None
+    if hits:
+        return f"평가하는 말: {hits[0]}"
+    hard = [w for w in HARD_WORDS if w in text and w not in allowed]
+    if hard:
+        return f"어려운 표현: {hard[0]}"
+    if re.search(r"[A-Za-z]{2,}", text):
+        return "영어 표현"
+    return None
+
+
+def _allowed_text(clues: list[dict]) -> str:
+    return " ".join(f"{c['name']} {c['description']} {c['safe_action']}" for c in clues)
 
 
 class DeepCoach:
@@ -58,7 +80,7 @@ class DeepCoach:
                 break
             except Exception:
                 continue
-            sentences = parse(raw)
+            sentences = parse(raw, _allowed_text(_focus_clues(s, req)))
             if sentences:
                 return DeepFeedbackResponse(status="ok", feedback=sentences, masked=masked, source="model")
         return DeepFeedbackResponse(status="ok", feedback=template(s, _focus_clues(s, req), answer), masked=masked,
@@ -84,7 +106,8 @@ def build_prompt(s: dict, clues: list[dict], question: str | None, answer: str) 
         f"<<<{answer}>>>",
         "",
         "[규칙]",
-        f"- 피드백은 1~{MAX_SENTENCES}문장. 한 문장씩 짧게, '~해요' 말투, 쉬운 단어.",
+        f"- 피드백은 1~{MAX_SENTENCES}문장. 한 문장은 {MAX_SENTENCE_CHARS // 2}자 안팎으로 짧게, '~해요' 말투, 쉬운 단어.",
+        "- 보이스피싱, 범죄, 처벌, 대포통장 같은 어려운 말 대신 쉬운 말로 풀어 써. 영어도 쓰지 마.",
         "- 먼저 아이의 이유에서 잘 생각한 점을 구체적으로 칭찬해.",
         "- 위 위험 신호 중 아이의 글에 나오지 않은 것이 있으면, 그중 하나를 반드시 짚어 줘."
         " 왜 위험한지 쉽게 말하고 안전한 대처를 알려 줘. (아이가 모두 말했으면 생략)",
@@ -97,8 +120,9 @@ def build_prompt(s: dict, clues: list[dict], question: str | None, answer: str) 
     return "\n".join(lines)
 
 
-def parse(raw: str) -> list[str] | None:
-    """문장 1~3개가 모두 기준을 지켰을 때만 쓴다."""
+def parse(raw: str, allowed: str = "") -> list[str] | None:
+    """문장 1~3개가 모두 기준을 지켰을 때만 쓴다.
+    항목 하나에 문장이 여러 개 들어 있어도 문장 단위로 펴서 세고, 앞 3문장만 남긴다 (전체 길이도 검사)."""
     data = parse_json_object(raw)
     items = data.get("feedback") if data else None
     if isinstance(items, str):
@@ -106,14 +130,17 @@ def parse(raw: str) -> list[str] | None:
     if not isinstance(items, list) or not items:
         return None
     out = []
-    for item in items[:MAX_SENTENCES]:
+    for item in items:
         try:
             text = clean_text(item)
         except TypeError:
             return None
-        if not text or sentence_problem(text):
-            return None
-        out.append(text)
+        out += [x.strip() for x in split_sentences(text) if x.strip()] if text else []
+    out = out[:MAX_SENTENCES]
+    if not out or any(sentence_problem(x, allowed) for x in out):
+        return None
+    if sum(len(x) for x in out) > MAX_TOTAL_CHARS:
+        return None
     return out
 
 

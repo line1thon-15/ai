@@ -1,4 +1,4 @@
-"""P1 기능(T-74, T-32, T-34, T-78)의 계약 샘플이 서버 응답과 같은지 확인한다."""
+"""P1 기능(T-74, T-34, T-78)의 계약 샘플이 서버 응답과 같은지 확인한다."""
 import json
 from pathlib import Path
 
@@ -16,9 +16,10 @@ def test_start_with_hint(start_server):
     assert status == 200 and body == load("practice.start.hint.response.json") and body["hint"]
 
 
-def test_setup(start_server):
-    status, body = start_server().request("POST", "/internal/v1/practice/setup", load("practice.setup.request.json"))
-    assert status == 200 and body == load("practice.setup.response.json")
+def test_setup_route_removed(start_server):
+    # T-32: 난이도·앱→플랫폼 변환은 백엔드 몫이라 AI 에는 이 경로가 없다
+    status, _ = start_server().request("POST", "/internal/v1/practice/setup", {})
+    assert status == 404
 
 
 def test_normal_variant(start_server):

@@ -1,17 +1,44 @@
 {
   "version": "v1",
   "areas": [
-    {"id": "scam", "name": "사기"},
-    {"id": "identity_lending", "name": "명의 빌려주기"},
-    {"id": "friend_pressure", "name": "친구의 무리한 부탁"}
+    {
+      "id": "scam",
+      "name": "사기"
+    },
+    {
+      "id": "identity_lending",
+      "name": "명의 빌려주기"
+    },
+    {
+      "id": "friend_pressure",
+      "name": "친구의 무리한 부탁"
+    }
   ],
   "clues": [
     {
       "id": "advance_payment",
-      "areas": ["scam"],
-      "keywords": ["입금", "보내", "보증금", "교육비", "수수료", "선입금", "송금", "결제"],
-      "choice_templates": {"correct": "먼저 돈을 내라니 이상해요. 안 보낼래요.", "doubtful": "먼저 내라니 이상하긴 한데, 그래도 보낼게요.", "other": "알겠어요. 그럼 돈은 지금 바로 보낼게요."},
-      "hints": {"1": "상대가 일을 시작하기 전에 무엇을 해 달라고 하는지 살펴봐요.", "2": "일하기 전에 돈을 먼저 내라는 말이 괜찮은지 생각해 봐요."},
+      "areas": [
+        "scam"
+      ],
+      "keywords": [
+        "입금",
+        "보내",
+        "보증금",
+        "교육비",
+        "수수료",
+        "선입금",
+        "송금",
+        "결제"
+      ],
+      "choice_templates": {
+        "correct": "먼저 돈을 내라니 이상해요. 안 보낼래요.",
+        "doubtful": "먼저 내라니 이상하긴 한데, 그래도 보낼게요.",
+        "other": "알겠어요. 그럼 돈은 지금 바로 보낼게요."
+      },
+      "hints": {
+        "1": "상대가 일을 시작하기 전에 무엇을 해 달라고 하는지 살펴봐요.",
+        "2": "일하기 전에 돈을 먼저 내라는 말이 괜찮은지 생각해 봐요."
+      },
       "sources": [
         {
           "org": "고용노동부 원주지청",
@@ -19,7 +46,8 @@
           "url": "https://www.moel.go.kr/local/wonju/news/hongbo/view.do?bbs_seq=20251101015",
           "date": "2025-11-21",
           "evidence": "취업사기 예방 수칙으로 '신분증, 금전 요구 시에는 반드시 거절'하라고 안내함.",
-          "strength": "direct"
+          "strength": "direct",
+          "source_type": "official"
         }
       ],
       "name": "먼저 돈을 내라고 해요",
@@ -33,26 +61,53 @@
     },
     {
       "id": "too_good_pay",
-      "areas": ["scam", "identity_lending"],
-      "keywords": ["원", "벌", "돈", "수익", "많이"],
-      "choice_templates": {"correct": "이렇게 많이 주는 건 이상해요. 안 할래요.", "doubtful": "많이 줘서 이상하긴 한데, 그래도 해 볼게요.", "other": "그렇게 많이 준다니 좋아요. 바로 할게요."},
-      "hints": {"1": "하는 일과 받는 돈을 서로 비교해 봐요.", "2": "쉬운 일인데 돈을 아주 많이 준다는 말이 이상하지 않은지 생각해 봐요."},
+      "areas": [
+        "scam",
+        "identity_lending"
+      ],
+      "keywords": [
+        "원",
+        "벌",
+        "돈",
+        "수익",
+        "많이"
+      ],
+      "choice_templates": {
+        "correct": "이렇게 많이 주는 건 이상해요. 안 할래요.",
+        "doubtful": "많이 줘서 이상하긴 한데, 그래도 해 볼게요.",
+        "other": "그렇게 많이 준다니 좋아요. 바로 할게요."
+      },
+      "hints": {
+        "1": "하는 일과 받는 돈을 서로 비교해 봐요.",
+        "2": "쉬운 일인데 돈을 아주 많이 준다는 말이 이상하지 않은지 생각해 봐요."
+      },
       "sources": [
-        {
-          "org": "경찰청 국가수사본부 (경향신문 보도)",
-          "title": "'고액 알바' 지원했다 '인간 대포통장'으로···보이스피싱 피의자 63% 청년구직자",
-          "url": "https://www.khan.co.kr/article/202202211441001",
-          "date": "2022-02-21",
-          "evidence": "'하루 40만 원 이상' 같은 고액 알바 공고가 보이스피싱 현금 수거책 모집 미끼라고 경고함.",
-          "strength": "direct"
-        },
         {
           "org": "고용노동부 원주지청",
           "title": "취업사기 주의",
           "url": "https://www.moel.go.kr/local/wonju/news/hongbo/view.do?bbs_seq=20251101015",
           "date": "2025-11-21",
           "evidence": "'고수익, 경력 무관 등 주요 키워드 조심'이라고 안내함.",
-          "strength": "direct"
+          "strength": "direct",
+          "source_type": "official"
+        },
+        {
+          "org": "금융위원회·금융감독원",
+          "title": "[보도참고] 해외송금대행을 가장한 보이스피싱에 주의하세요! 의심하고, 전화끊고, 확인하고!",
+          "url": "https://fsc.go.kr/no010101/74037",
+          "date": "2019-12-17",
+          "strength": "direct",
+          "evidence": "'단순 업무만으로 고액의 수익을 올릴 수 있다고 하거나' 하는 제안은 보이스피싱일 수 있다고 경고함.",
+          "source_type": "official"
+        },
+        {
+          "org": "경찰청 국가수사본부 (경향신문 보도)",
+          "title": "'고액 알바' 지원했다 '인간 대포통장'으로···보이스피싱 피의자 63% 청년구직자",
+          "url": "https://www.khan.co.kr/article/202202211441001",
+          "date": "2022-02-21",
+          "evidence": "'하루 40만 원 이상' 같은 고액 알바 공고가 보이스피싱 현금 수거책 모집 미끼라고 경고함.",
+          "strength": "direct",
+          "source_type": "press"
         }
       ],
       "name": "쉬운 일인데 돈을 너무 많이 줘요",
@@ -66,10 +121,30 @@
     },
     {
       "id": "urgency",
-      "areas": ["scam", "identity_lending", "friend_pressure"],
-      "keywords": ["오늘", "지금", "빨리", "바로", "당장", "마감", "얼마 안", "늦"],
-      "choice_templates": {"correct": "이렇게 재촉하니 이상해요. 안 할래요.", "doubtful": "너무 급해서 이상하긴 한데, 일단 할게요.", "other": "네, 늦기 전에 지금 바로 할게요."},
-      "hints": {"1": "상대가 생각할 시간을 주는지 살펴봐요.", "2": "지금 당장 정하라고 재촉하는 말이 괜찮은지 생각해 봐요."},
+      "areas": [
+        "scam",
+        "identity_lending",
+        "friend_pressure"
+      ],
+      "keywords": [
+        "오늘",
+        "지금",
+        "빨리",
+        "바로",
+        "당장",
+        "마감",
+        "얼마 안",
+        "늦"
+      ],
+      "choice_templates": {
+        "correct": "이렇게 재촉하니 이상해요. 안 할래요.",
+        "doubtful": "너무 급해서 이상하긴 한데, 일단 할게요.",
+        "other": "네, 늦기 전에 지금 바로 할게요."
+      },
+      "hints": {
+        "1": "상대가 생각할 시간을 주는지 살펴봐요.",
+        "2": "지금 당장 정하라고 재촉하는 말이 괜찮은지 생각해 봐요."
+      },
       "sources": [
         {
           "org": "금융위원회·금융감독원",
@@ -77,7 +152,8 @@
           "url": "https://fsc.go.kr/po010104/86250?curPage=1",
           "date": "2026-02-10",
           "evidence": "사기범 발언 예시로 '지금 통화 중인 상태로 입금해'를 실어, 생각할 틈 없이 행동하게 재촉하는 수법을 보여 줌.",
-          "strength": "direct"
+          "strength": "direct",
+          "source_type": "official"
         }
       ],
       "name": "빨리 정하라고 재촉해요",
@@ -91,18 +167,46 @@
     },
     {
       "id": "personal_info",
-      "areas": ["scam"],
-      "keywords": ["신분증", "주민", "계좌", "비밀번호", "개인정보", "정보", "번호", "사진"],
-      "choice_templates": {"correct": "제 정보를 달라니 이상해요. 안 보낼래요.", "doubtful": "정보를 달라니 이상한데, 이번만 보낼게요.", "other": "네, 지금 바로 다 알려 드릴게요."},
-      "hints": {"1": "상대가 내 무엇을 달라고 하는지 살펴봐요.", "2": "신분증이나 계좌, 비밀번호를 달라는 말이 괜찮은지 생각해 봐요."},
+      "areas": [
+        "scam"
+      ],
+      "keywords": [
+        "신분증",
+        "주민",
+        "계좌",
+        "비밀번호",
+        "개인정보",
+        "정보",
+        "번호",
+        "사진"
+      ],
+      "choice_templates": {
+        "correct": "제 정보를 달라니 이상해요. 안 보낼래요.",
+        "doubtful": "정보를 달라니 이상한데, 이번만 보낼게요.",
+        "other": "네, 지금 바로 다 알려 드릴게요."
+      },
+      "hints": {
+        "1": "상대가 내 무엇을 달라고 하는지 살펴봐요.",
+        "2": "신분증이나 계좌, 비밀번호를 달라는 말이 괜찮은지 생각해 봐요."
+      },
       "sources": [
         {
-          "org": "경찰청 (머니투데이 보도)",
-          "title": "공공기관이 현금 요구? 100% 피싱… \"신고는 다른 사람 전화로\"",
-          "url": "https://www.mt.co.kr/society/2025/02/23/2025022109073027378",
-          "date": "2025-02-23",
-          "evidence": "경찰청 '피싱 예방 10계명'을 전하며 신분증이나 신용카드 사진을 보내 달라는 요구에 응하지 말라고 안내함.",
-          "strength": "direct"
+          "org": "금융감독원",
+          "title": "(소비자경보 2021-1호) 신분증, 카드번호 등 개인(신용)정보를 요구하는 보이스피싱 경보!",
+          "url": "https://www.fss.or.kr/fss/bbs/B0000175/view.do?menuNo=200204&nttId=34901",
+          "date": "2021-02-05",
+          "evidence": "사기범이 '주민등록증‧운전면허증 사진, 신용카드‧은행계좌 번호 및 비밀번호 등을 직접 보낼 것을 요구'한다고 경고함.",
+          "strength": "direct",
+          "source_type": "official"
+        },
+        {
+          "org": "대한민국 정책브리핑 (자료: 금융감독원)",
+          "title": "[오맞! 이 정책] 모르는 돈이 내 통장에?…사기이용계좌 예방법",
+          "url": "https://www.korea.kr/news/policyNewsView.do?newsId=148906430",
+          "date": "2022-10-07",
+          "strength": "direct",
+          "evidence": "'정식 채용 이전 단계에서 신분증 사본, 통장 계좌번호 등을 요구 시 무조건 거절'하라고 안내함.",
+          "source_type": "official"
         },
         {
           "org": "서울특별시 강남구청",
@@ -110,7 +214,17 @@
           "url": "https://www.gangnam.go.kr/board/cardnews/901/view.do?mid=fm0306%29",
           "date": "2023-01-20",
           "evidence": "'신분증 계좌번호 비밀번호 좀 보내줘'라고 요구하는 문자 사기 예시를 소개함.",
-          "strength": "direct"
+          "strength": "direct",
+          "source_type": "local_gov"
+        },
+        {
+          "org": "경찰청 (머니투데이 보도)",
+          "title": "공공기관이 현금 요구? 100% 피싱… \"신고는 다른 사람 전화로\"",
+          "url": "https://www.mt.co.kr/society/2025/02/23/2025022109073027378",
+          "date": "2025-02-23",
+          "evidence": "경찰청 '피싱 예방 10계명'을 전하며 신분증이나 신용카드 사진을 보내 달라는 요구에 응하지 말라고 안내함.",
+          "strength": "direct",
+          "source_type": "press"
         }
       ],
       "name": "꼭 필요하지 않은 내 정보를 달라고 해요",
@@ -124,10 +238,26 @@
     },
     {
       "id": "suspicious_link",
-      "areas": ["scam"],
-      "keywords": ["링크", "앱", "example.com", "설치", "눌러", "접속"],
-      "choice_templates": {"correct": "링크는 안 누를래요. 어른께 보여 줄게요.", "doubtful": "링크가 이상하긴 한데, 한 번만 눌러 볼게요.", "other": "네, 지금 바로 눌러서 들어가 볼게요."},
-      "hints": {"1": "상대가 무엇을 누르라고 하는지 살펴봐요.", "2": "모르는 링크를 누르거나 앱을 깔라는 말이 괜찮은지 생각해 봐요."},
+      "areas": [
+        "scam"
+      ],
+      "keywords": [
+        "링크",
+        "앱",
+        "example.com",
+        "설치",
+        "눌러",
+        "접속"
+      ],
+      "choice_templates": {
+        "correct": "링크는 안 누를래요. 어른께 보여 줄게요.",
+        "doubtful": "링크가 이상하긴 한데, 한 번만 눌러 볼게요.",
+        "other": "네, 지금 바로 눌러서 들어가 볼게요."
+      },
+      "hints": {
+        "1": "상대가 무엇을 누르라고 하는지 살펴봐요.",
+        "2": "모르는 링크를 누르거나 앱을 깔라는 말이 괜찮은지 생각해 봐요."
+      },
       "sources": [
         {
           "org": "금융위원회·금융감독원",
@@ -135,7 +265,8 @@
           "url": "https://fsc.go.kr/po010104/86250?curPage=1",
           "date": "2026-02-10",
           "evidence": "계명 7: '불분명한 링크(URL) 절대 클릭 금지', 악성앱이 설치될 수 있다고 안내함.",
-          "strength": "direct"
+          "strength": "direct",
+          "source_type": "official"
         },
         {
           "org": "경찰청 (머니투데이 보도)",
@@ -143,7 +274,8 @@
           "url": "https://www.mt.co.kr/society/2025/02/23/2025022109073027378",
           "date": "2025-02-23",
           "evidence": "문자 속 URL을 누르면 악성 앱이 설치돼 스마트폰이 사기범에게 통제될 수 있다고 경고함.",
-          "strength": "direct"
+          "strength": "direct",
+          "source_type": "press"
         }
       ],
       "name": "모르는 링크나 앱을 누르라고 해요",
@@ -157,10 +289,29 @@
     },
     {
       "id": "keep_secret",
-      "areas": ["scam", "identity_lending", "friend_pressure"],
-      "keywords": ["비밀로", "비밀이", "비밀을", "말하지", "알리지", "모르게", "말하면"],
-      "choice_templates": {"correct": "비밀로 하라니 이상해요. 부모님께 말할게요.", "doubtful": "비밀로 하라니 이상하긴 한데, 말 안 할게요.", "other": "알겠어요. 부모님께도 아무 말 안 할게요."},
-      "hints": {"1": "상대가 누구에게 말하지 말라고 하는지 살펴봐요.", "2": "부모님께 비밀로 하라는 말이 괜찮은지 생각해 봐요."},
+      "areas": [
+        "scam",
+        "identity_lending",
+        "friend_pressure"
+      ],
+      "keywords": [
+        "비밀로",
+        "비밀이",
+        "비밀을",
+        "말하지",
+        "알리지",
+        "모르게",
+        "말하면"
+      ],
+      "choice_templates": {
+        "correct": "비밀로 하라니 이상해요. 부모님께 말할게요.",
+        "doubtful": "비밀로 하라니 이상하긴 한데, 말 안 할게요.",
+        "other": "알겠어요. 부모님께도 아무 말 안 할게요."
+      },
+      "hints": {
+        "1": "상대가 누구에게 말하지 말라고 하는지 살펴봐요.",
+        "2": "부모님께 비밀로 하라는 말이 괜찮은지 생각해 봐요."
+      },
       "sources": [
         {
           "org": "금융위원회·금융감독원",
@@ -168,7 +319,8 @@
           "url": "https://fsc.go.kr/po010104/86250?curPage=1",
           "date": "2026-02-10",
           "evidence": "사기범 발언 예시로 '절대로 아무한테도 말하면 안 됩니다'를 실음.",
-          "strength": "direct"
+          "strength": "direct",
+          "source_type": "official"
         }
       ],
       "name": "다른 사람에게 말하지 말라고 해요",
@@ -182,18 +334,53 @@
     },
     {
       "id": "lend_identity",
-      "areas": ["identity_lending"],
-      "keywords": ["통장", "카드", "휴대폰", "명의", "이름으로", "빌려"],
-      "choice_templates": {"correct": "통장이나 휴대폰은 빌려줄 수 없어요.", "doubtful": "빌려 달라니 이상한데, 잠깐만 빌려줄게요.", "other": "좋아요, 제 통장 잠깐 빌려 드릴게요."},
-      "hints": {"1": "상대가 내 물건 중 무엇을 빌려 달라고 하는지 살펴봐요.", "2": "내 통장이나 휴대폰을 빌려 달라는 말이 괜찮은지 생각해 봐요."},
+      "areas": [
+        "identity_lending"
+      ],
+      "keywords": [
+        "통장",
+        "카드",
+        "휴대폰",
+        "명의",
+        "이름으로",
+        "빌려"
+      ],
+      "choice_templates": {
+        "correct": "통장이나 휴대폰은 빌려줄 수 없어요.",
+        "doubtful": "빌려 달라니 이상한데, 잠깐만 빌려줄게요.",
+        "other": "좋아요, 제 통장 잠깐 빌려 드릴게요."
+      },
+      "hints": {
+        "1": "상대가 내 물건 중 무엇을 빌려 달라고 하는지 살펴봐요.",
+        "2": "내 통장이나 휴대폰을 빌려 달라는 말이 괜찮은지 생각해 봐요."
+      },
       "sources": [
+        {
+          "org": "금융위원회·금융감독원",
+          "title": "[보도참고] 해외송금대행을 가장한 보이스피싱에 주의하세요! 의심하고, 전화끊고, 확인하고!",
+          "url": "https://fsc.go.kr/no010101/74037",
+          "date": "2019-12-17",
+          "strength": "direct",
+          "evidence": "'계좌를 대여해 주면 돈을 준다고 제안하는 경우 보이스피싱 범죄일 수 있음을 의심해야 한다'고 안내함.",
+          "source_type": "official"
+        },
+        {
+          "org": "대한민국 정책브리핑 (자료: 금융감독원)",
+          "title": "[오맞! 이 정책] 모르는 돈이 내 통장에?…사기이용계좌 예방법",
+          "url": "https://www.korea.kr/news/policyNewsView.do?newsId=148906430",
+          "date": "2022-10-07",
+          "strength": "direct",
+          "evidence": "'통장 대여·양도나 본인계좌를 통한 자금의 이체·현금인출은 불법이니 무조건 거절'하라고 안내함.",
+          "source_type": "official"
+        },
         {
           "org": "금융감독원 학교금융교육팀 (한국경제 생글생글 기고)",
           "title": "친구가 고수익 알바라며 통장 빌려달래도 응하지 마세요",
           "url": "https://sgsg.hankyung.com/article/2021052144611",
           "date": null,
           "evidence": "고수익 알바를 미끼로 청소년의 통장을 대포통장으로 쓰는 사례가 많으며, 통장을 빌려주는 것은 불법이라고 안내함.",
-          "strength": "direct"
+          "strength": "direct",
+          "source_type": "press"
         },
         {
           "org": "경찰청 국가수사본부 (경향신문 보도)",
@@ -201,7 +388,8 @@
           "url": "https://www.khan.co.kr/article/202202211441001",
           "date": "2022-02-21",
           "evidence": "통장이나 휴대전화를 개설해 달라는 요구에 응하면 '인간 대포통장'이 되어 처벌받을 수 있다고 경고함.",
-          "strength": "direct"
+          "strength": "direct",
+          "source_type": "press"
         }
       ],
       "name": "내 통장·카드·휴대폰 이름을 빌려 달라고 해요",
@@ -215,10 +403,25 @@
     },
     {
       "id": "no_risk_claim",
-      "areas": ["identity_lending"],
-      "keywords": ["걱정", "문제", "책임", "괜찮", "아무 일"],
-      "choice_templates": {"correct": "괜찮다는 말만 믿을 수 없어요. 안 할래요.", "doubtful": "괜찮다니 좀 이상한데, 그래도 믿어 볼게요.", "other": "그렇게 말하니까 걱정 안 하고 할게요."},
-      "hints": {"1": "상대가 왜 걱정하지 말라고 하는지 살펴봐요.", "2": "문제없다는 말만 믿어도 되는지 생각해 봐요."},
+      "areas": [
+        "identity_lending"
+      ],
+      "keywords": [
+        "걱정",
+        "문제",
+        "책임",
+        "괜찮",
+        "아무 일"
+      ],
+      "choice_templates": {
+        "correct": "괜찮다는 말만 믿을 수 없어요. 안 할래요.",
+        "doubtful": "괜찮다니 좀 이상한데, 그래도 믿어 볼게요.",
+        "other": "그렇게 말하니까 걱정 안 하고 할게요."
+      },
+      "hints": {
+        "1": "상대가 왜 걱정하지 말라고 하는지 살펴봐요.",
+        "2": "문제없다는 말만 믿어도 되는지 생각해 봐요."
+      },
       "sources": [
         {
           "org": "경찰청 국가수사본부 (경향신문 보도)",
@@ -226,7 +429,8 @@
           "url": "https://www.khan.co.kr/article/202202211441001",
           "date": "2022-02-21",
           "evidence": "수거책 모집 공고의 '불법도 아니라 알바분에게 피해는 없습니다' 문구를 소개하고 거절·신고하라고 당부함. 명의 대여가 아닌 현금 수거 알바 사례임.",
-          "strength": "indirect"
+          "strength": "indirect",
+          "source_type": "press"
         }
       ],
       "name": "걱정 말라며 안심시켜요",
@@ -240,10 +444,25 @@
     },
     {
       "id": "guilt_pressure",
-      "areas": ["friend_pressure"],
-      "keywords": ["서운", "미안", "너무하", "힘든데", "실망"],
-      "choice_templates": {"correct": "미안하지만 이건 안 할래. 나도 힘들어.", "doubtful": "서운하게 하니 좀 이상한데, 그냥 해 줄게.", "other": "알았어, 미안해. 내가 대신 해 줄게."},
-      "hints": {"1": "내가 거절하면 상대가 어떻게 말하는지 살펴봐요.", "2": "미안한 마음이 들게 하는 말에 꼭 따라야 하는지 생각해 봐요."},
+      "areas": [
+        "friend_pressure"
+      ],
+      "keywords": [
+        "서운",
+        "미안",
+        "너무하",
+        "힘든데",
+        "실망"
+      ],
+      "choice_templates": {
+        "correct": "미안하지만 이건 안 할래. 나도 힘들어.",
+        "doubtful": "서운하게 하니 좀 이상한데, 그냥 해 줄게.",
+        "other": "알았어, 미안해. 내가 대신 해 줄게."
+      },
+      "hints": {
+        "1": "내가 거절하면 상대가 어떻게 말하는지 살펴봐요.",
+        "2": "미안한 마음이 들게 하는 말에 꼭 따라야 하는지 생각해 봐요."
+      },
       "sources": [],
       "name": "안 해 주면 미안한 마음이 들게 해요",
       "description": "거절하면 서운하다, 너무하다는 식으로 죄책감을 느끼게 하는 것",
@@ -256,10 +475,26 @@
     },
     {
       "id": "friendship_threat",
-      "areas": ["friend_pressure"],
-      "keywords": ["안 놀", "친구 안", "말할 거", "끝이", "절교", "애들한테"],
-      "choice_templates": {"correct": "친구를 걸고 겁주는 건 이상해. 안 할래.", "doubtful": "겁주는 게 이상하긴 한데, 그래도 해 줄게.", "other": "알았어, 해 줄게. 그러니까 화내지 마."},
-      "hints": {"1": "부탁을 안 들어주면 상대가 어떻게 하겠다고 하는지 살펴봐요.", "2": "친구를 그만하겠다는 말에 꼭 따라야 하는지 생각해 봐요."},
+      "areas": [
+        "friend_pressure"
+      ],
+      "keywords": [
+        "안 놀",
+        "친구 안",
+        "말할 거",
+        "끝이",
+        "절교",
+        "애들한테"
+      ],
+      "choice_templates": {
+        "correct": "친구를 걸고 겁주는 건 이상해. 안 할래.",
+        "doubtful": "겁주는 게 이상하긴 한데, 그래도 해 줄게.",
+        "other": "알았어, 해 줄게. 그러니까 화내지 마."
+      },
+      "hints": {
+        "1": "부탁을 안 들어주면 상대가 어떻게 하겠다고 하는지 살펴봐요.",
+        "2": "친구를 그만하겠다는 말에 꼭 따라야 하는지 생각해 봐요."
+      },
       "sources": [
         {
           "org": "교육부·한국대학교육협의회",
@@ -267,7 +502,8 @@
           "url": "https://kcue.or.kr/_upload/news/2024/08/29/application_5bcfbe188d06799e178f61e3a7eb0cb5.pdf",
           "date": "2023-08",
           "evidence": "따돌림을 '의도적이고 반복적으로 피하거나 어울리지 못하도록 막는 행위'로 정의함. '친구 안 한다'는 위협 문구 자체는 없음.",
-          "strength": "indirect"
+          "strength": "indirect",
+          "source_type": "official"
         }
       ],
       "name": "안 해 주면 친구 안 한다고 해요",
@@ -281,10 +517,25 @@
     },
     {
       "id": "burdensome_request",
-      "areas": ["friend_pressure"],
-      "keywords": ["빌려줘", "대신", "해 줄", "사 줘", "줘"],
-      "choice_templates": {"correct": "그건 나한테 부담돼서 안 될 것 같아.", "doubtful": "좀 부담되긴 하는데, 이번만 해 줄게.", "other": "응, 그 정도는 내가 대신 해 줄게."},
-      "hints": {"1": "이 부탁이 나에게 부담되는지 살펴봐요.", "2": "내가 힘든 부탁도 꼭 들어줘야 하는지 생각해 봐요."},
+      "areas": [
+        "friend_pressure"
+      ],
+      "keywords": [
+        "빌려줘",
+        "대신",
+        "해 줄",
+        "사 줘",
+        "줘"
+      ],
+      "choice_templates": {
+        "correct": "그건 나한테 부담돼서 안 될 것 같아.",
+        "doubtful": "좀 부담되긴 하는데, 이번만 해 줄게.",
+        "other": "응, 그 정도는 내가 대신 해 줄게."
+      },
+      "hints": {
+        "1": "이 부탁이 나에게 부담되는지 살펴봐요.",
+        "2": "내가 힘든 부탁도 꼭 들어줘야 하는지 생각해 봐요."
+      },
       "sources": [
         {
           "org": "교육부·한국대학교육협의회",
@@ -292,7 +543,8 @@
           "url": "https://kcue.or.kr/_upload/news/2024/08/29/application_5bcfbe188d06799e178f61e3a7eb0cb5.pdf",
           "date": "2023-08",
           "evidence": "돌려줄 생각 없이 돈·물건을 빌려 달라는 요구(금품갈취), 과제·심부름 대행 강요를 학교폭력 유형으로 제시함.",
-          "strength": "indirect"
+          "strength": "indirect",
+          "source_type": "official"
         },
         {
           "org": "한국청소년정책연구원 학교폭력예방교육지원센터",
@@ -300,7 +552,8 @@
           "url": "https://maed.jne.go.kr/data/RFC3/upload_data/board_data/BBS_0002675/165310002346017.pdf",
           "date": "2022-02-28",
           "evidence": "'대신 숙제하기, 빵셔틀'처럼 의무 없는 일을 억지로 시키는 것을 강요로 설명함.",
-          "strength": "indirect"
+          "strength": "indirect",
+          "source_type": "official"
         }
       ],
       "name": "내가 힘든 부탁을 해요",
@@ -314,10 +567,25 @@
     },
     {
       "id": "ignoring_no",
-      "areas": ["friend_pressure"],
-      "keywords": ["한 번만", "제발", "자꾸", "그냥 해", "왜 안"],
-      "choice_templates": {"correct": "아까 싫다고 했잖아. 그래도 안 할래.", "doubtful": "자꾸 조르는 게 싫은데, 한 번만 해 줄게.", "other": "알았어, 그럼 그냥 내가 다 해 줄게."},
-      "hints": {"1": "내가 싫다고 한 뒤에 상대가 어떻게 하는지 살펴봐요.", "2": "싫다고 했는데 계속 조르는 게 괜찮은지 생각해 봐요."},
+      "areas": [
+        "friend_pressure"
+      ],
+      "keywords": [
+        "한 번만",
+        "제발",
+        "자꾸",
+        "그냥 해",
+        "왜 안"
+      ],
+      "choice_templates": {
+        "correct": "아까 싫다고 했잖아. 그래도 안 할래.",
+        "doubtful": "자꾸 조르는 게 싫은데, 한 번만 해 줄게.",
+        "other": "알았어, 그럼 그냥 내가 다 해 줄게."
+      },
+      "hints": {
+        "1": "내가 싫다고 한 뒤에 상대가 어떻게 하는지 살펴봐요.",
+        "2": "싫다고 했는데 계속 조르는 게 괜찮은지 생각해 봐요."
+      },
       "sources": [
         {
           "org": "교육부·한국대학교육협의회",
@@ -325,7 +593,8 @@
           "url": "https://kcue.or.kr/_upload/news/2024/08/29/application_5bcfbe188d06799e178f61e3a7eb0cb5.pdf",
           "date": "2023-08",
           "evidence": "'의사에 반하는 행동을 강요하는 행위'를 학교폭력(강요)으로 규정함. 거절 후 계속 조르는 상황을 직접 다루지는 않음.",
-          "strength": "indirect"
+          "strength": "indirect",
+          "source_type": "official"
         }
       ],
       "name": "싫다고 했는데 계속 졸라요",

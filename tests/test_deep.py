@@ -113,3 +113,53 @@ def test_prompt_requires_pointing_out_a_missed_clue():
     p = FakeProvider(reply(GOOD))
     DeepCoach(p).feedback(req())
     assert "반드시 짚어 줘" in p.last_prompt
+
+
+# ---- 백엔드 리뷰 반영: 전체 길이와 어려운 표현 검사 ------------------------------------
+import json as _json  # noqa: E402
+
+import pytest as _pytest  # noqa: E402
+
+from app.content import load_all_scenarios as _load  # noqa: E402
+from app.deep import (MAX_SENTENCE_CHARS, MAX_TOTAL_CHARS, _allowed_text, _focus_clues,  # noqa: E402
+                      parse as _parse, sentence_problem as _problem, template as _template)
+from app.schemas import DeepFeedbackRequest as _Req  # noqa: E402
+
+_S = _load()
+
+
+def _raw(items):
+    return _json.dumps({"feedback": items}, ensure_ascii=False)
+
+
+def test_hard_word_rejected():
+    assert _parse(_raw(["이유를 잘 말했어요.", "이건 보이스피싱 범죄에 이용될 수 있어요."])) is None
+
+
+def test_english_rejected():
+    assert _parse(_raw(["DM으로 온 제안은 조심해요."])) is None
+
+
+def test_long_sentence_rejected():
+    long = "돈을 먼저 보내라는 말은 " + "아주 " * 20 + "위험해요."
+    assert len(long) > MAX_SENTENCE_CHARS and _parse(_raw([long])) is None
+
+
+def test_total_length_rejected():
+    s = "돈을 먼저 보내라고 하거나 통장을 빌려 달라고 하면 바로 멈추고 집에 가서 어른에게 꼭 말해요."  # 한 문장은 기준 안
+    assert len(s) <= MAX_SENTENCE_CHARS and len(s) * 3 > MAX_TOTAL_CHARS
+    assert _parse(_raw([s, s, s])) is None
+
+
+def test_sentences_inside_one_item_are_counted():
+    out = _parse(_raw(["잘 생각했어요. 돈을 먼저 내라는 말은 이상해요. 어른에게 말해요. 그리고 또 조심해요."]))
+    assert out == ["잘 생각했어요.", "돈을 먼저 내라는 말은 이상해요.", "어른에게 말해요."]
+
+
+@_pytest.mark.parametrize("sid", [k for k, s in _S.items() if s.get("kind") != "normal"])
+def test_templates_pass_new_checks(sid):
+    s = _S[sid]
+    clues = _focus_clues(s, _Req(scenario_id=sid, answer="몰라요"))
+    out = _template(s, clues, "몰라요")
+    assert all(_problem(x, _allowed_text(clues)) is None for x in out), out
+    assert sum(len(x) for x in out) <= MAX_TOTAL_CHARS
