@@ -39,21 +39,46 @@ NORMAL_RISK_PHRASES = (
 STRANGER_PHRASES = ("모르는 사람", "낯선 사람", "모르는 계정", "처음 보는 사람", "오픈채팅")
 
 
-# 위험 단어 뒤에서 부정하면 '안전 안내'로 본다 ('고객센터는 비밀번호를 절대 묻지 않아요', '돈을 먼저 낼 필요 없어요')
+# 위험 단어 뒤 '같은 마디' 안에서 부정하면 안전 안내로 본다 ('고객센터는 비밀번호를 절대 묻지 않아요')
 _NEGATION = ("않", "없", "마세요", "말아", "금지")
 # 부정처럼 보여도 실제로는 요구·협박인 표현 ('비밀번호를 알려 주지 않으면 계정이 막혀요')
 _THREAT = ("않으면", "없으면", "안 하면", "안 그러면", "안 주면", "안 보내면")
+# 요구하는 말 (뒤에 '-지 마/-지 않'이 바로 붙으면 그 요구를 부정하는 안내)
+_REQUEST = ("알려", "보내", "입력", "적어", "말해", "넣어", "눌러", "찍어", "올려", "달라", "해 주", "해 줘", "하세요",
+            "줘", "주세요", "주실", "주면", "줄래")
+_NEGATED_REQUEST = re.compile(r"^\s*(주|해\s*주|해)?\s*지\s*(않|마|말)")
+# 요구하는 말이 '~달라는 사람', '~보내라는 말'처럼 꾸미는 말로 쓰이면 요구가 아니다 (뒤의 부정이 그 말 전체를 부정)
+_MODIFIER = re.compile(r"^\s*(달라|주라|해\s*달라|라|으라)?는\s")
 _SENTENCE_END = re.compile(r"[.!?。\n]")
+# 마디 경계: 쉼표나 이어 주는 말 뒤로는 다른 이야기다 ('알려 주세요, 잊지 마세요' 의 '마세요'는 비밀번호와 상관없음)
+_CLAUSE_END = re.compile(r",|，|;| 그리고 | 그런데 | 근데 |지만 |는데 ")
+
+
+def _has_live_request(clause: str) -> bool:
+    """마디 안에 부정되지 않은 요구가 있는지 ('알려 주세요' → 있음, '알려 주지 마세요' → 없음)."""
+    for verb in _REQUEST:
+        start = clause.find(verb)
+        while start != -1:
+            after = clause[start + len(verb):]
+            if not _NEGATED_REQUEST.match(after) and not _MODIFIER.match(after):
+                return True
+            start = clause.find(verb, start + 1)
+    return False
 
 
 def _is_safety_notice(tail: str) -> bool:
-    """위험 단어 뒤 같은 문장 안의 글(tail)이 그 단어를 부정하는 안내인지."""
-    if any(w in tail for w in _THREAT):
+    """위험 단어 바로 뒤 마디(tail)가 그 단어를 부정하는 안내인지.
+    1) 협박('않으면')이 있으면 요구  2) 부정되지 않은 요구('알려 주세요')가 있으면 요구
+    3) 같은 마디 안에 부정('않', '없', '마세요')이 있으면 안내  4) 그 밖에는 요구로 본다."""
+    clause = _CLAUSE_END.split(tail, maxsplit=1)[0]
+    if any(w in clause for w in _THREAT):
         return False
-    if any(w in tail for w in _NEGATION):
+    if _has_live_request(clause):
+        return False
+    if any(w in clause for w in _NEGATION):
         return True
     # '알려 주면 안 돼요'는 안내, '알려 주면 안 돼?'는 묻는 말이라 요구로 본다
-    return ("안 돼" in tail or "안 되" in tail) and not tail.rstrip().endswith("?")
+    return ("안 돼" in clause or "안 되" in clause) and not clause.rstrip().endswith("?")
 
 
 def _risky_use(text: str, phrase: str) -> bool:

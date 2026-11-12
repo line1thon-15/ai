@@ -210,3 +210,57 @@ def test_original_normal_texts_have_no_risk_request(nid):
     s = S[nid]
     for text in (s["title"], s["child_setup"], s["opening_line"], s["ai_role"]["persona"], NORMAL_FALLBACK):
         assert normal_risk_hits(text) == [], text
+
+
+# ---- 백엔드 3차 리뷰: 뒤에 붙은 '마세요' 같은 다른 부정 때문에 요구가 통과하면 안 된다 ----------------
+BYPASS = [
+    "비밀번호를 알려 주세요, 잊지 마세요.",
+    "계좌번호를 보내 주세요, 내용을 잊지 마세요.",
+    "비밀번호를 알려 주세요. 걱정하지 마세요.",
+    "비밀번호 알려 주고 다른 사람한테는 말하지 마세요.",
+    "계좌로 송금해 주세요, 늦지 않게요.",
+    "고객센터는 비밀번호를 묻지 않지만, 확인을 위해 비밀번호를 입력해 주세요, 걱정 마세요.",
+]
+STILL_SAFE = [
+    "고객센터는 비밀번호를 절대 묻지 않아요.",
+    "비밀번호는 누구에게도 알려 주지 마세요.",
+    "비밀번호를 알려 달라는 사람은 없어요.",
+    "링크는 누르지 마세요.",
+    "앱을 설치하지 마세요.",
+    "계좌번호는 보내지 않아도 돼요.",
+    "돈을 먼저 보낼 필요는 없어요.",
+    "빨리 정하지 않아도 돼요.",
+]
+
+
+@pytest.mark.parametrize("text", BYPASS)
+def test_trailing_negation_does_not_hide_request(text):
+    assert normal_risk_hits(text), text
+
+
+@pytest.mark.parametrize("text", STILL_SAFE)
+def test_safety_notices_still_pass(text):
+    assert normal_risk_hits(text) == [], text
+
+
+@pytest.mark.parametrize("text", BYPASS[:2])
+def test_bypass_blocked_in_variant(text):
+    bad = _variant_of(SUPPORT, "안녕하세요, 게임 고객센터예요. " + text + " 문의는 게임 안 메뉴에 남겨 주세요.")
+    assert any(p.startswith("risk_phrase") for p in check_variant(SUPPORT, bad))
+
+
+@pytest.mark.parametrize("text", BYPASS[:2])
+def test_bypass_blocked_in_turn(text):
+    s = SUPPORT
+    raw = json.dumps({"reply": text, "choices": {"correct": "a.", "doubtful": "b.", "other": "c."}}, ensure_ascii=False)
+    p = FakeProvider(raw)
+    res = PracticeEngine(p).turn(TurnRequest(scenario_id="normal_game_support_01", messages=[
+        Message(role="ai", text=s["opening_line"]), Message(role="child", text="어떻게 하면 돼요?")]))
+    assert res.source == "fallback" and normal_risk_hits(res.reply) == [] and p.calls == 2
+
+
+@pytest.mark.parametrize("text", BYPASS[:2])
+def test_bypass_blocked_in_normal_feedback(text):
+    p = FakeProvider(json.dumps({"feedback": text}, ensure_ascii=False))
+    res = Judge(p, S).feedback(FeedbackRequest(scenario_id="normal_game_support_01", normal_outcome="over_warned"))
+    assert res.source == "fallback"
