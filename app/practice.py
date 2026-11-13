@@ -54,8 +54,8 @@ class PracticeEngine:
             child_setup=s["child_setup"],
             revealed_clue_ids=opening,
             target_clue_id=target,
-            # 첫 대사에 단서가 없는 시나리오(T-29)는 '무슨 일인지 먼저 듣기'를 연습하는 시작 선택지를 쓴다
-            choices=arrange(dict(s["opening_choices"]) if target is None and s.get("opening_choices")
+            # 시나리오에 첫 단서에 맞춘 시작 선택지(opening_choices)가 있으면 그것, 없으면 단서의 선택지 예시
+            choices=arrange(dict(s["opening_choices"]) if target is not None and s.get("opening_choices")
                             else _templates(s, target)),
             choices_source="template",
             hint=hint_text(s, target, hint_level),
@@ -99,6 +99,9 @@ class PracticeEngine:
             # 대사에 그 단서의 말이 실제로 있어야 '드러냈다'고 인정한다. 한 턴에 새 단서는 1개만 (시나리오 순서로 첫 번째)
             new_ids = [i for i in valid_ids if i in claimed and i not in revealed and has_clue_keyword(full_reply, i)]
             keep, dropped = new_ids[:1], new_ids[1:]
+            # 아직 드러난 단서가 하나도 없는데 이번에도 단서가 없으면, 아이가 판단할 거리가 없다 → 다시 생성 / 준비된 대사
+            if not normal and not revealed and not keep:
+                continue
             reply = shorten(full_reply, keep, dropped)
             if (reply is None or len(reply) > MAX_REPLY_CHARS or any(has_clue_keyword(reply, d) for d in dropped)
                     or not check_output(reply, "roleplay").allowed):

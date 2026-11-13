@@ -14,7 +14,7 @@ from app.judge import Judge, normal_feedback_problem
 from app.practice import PracticeEngine
 from app.providers import FakeProvider
 from app.scenarios import base_as_variant, check_variant
-from app.schemas import FeedbackRequest, Message, TurnRequest, VariantRequest
+from app.schemas import FeedbackRequest, JudgeRequest, Message, TurnRequest, VariantRequest
 from app.variation import Variator
 
 S = load_all_scenarios()
@@ -223,27 +223,71 @@ def test_normal_fallback_line_fits_situation(nid):
     assert normal_risk_hits(res.reply) == []
 
 
-# ---- T-29: 첫 대사에 단서가 없는 시나리오 -----------------------------------------------
-@pytest.mark.parametrize("sid", [k for k, s in S.items()
-                                 if s.get("kind") == "risk" and s["area"] in ("identity_lending", "friend_pressure")])
-def test_start_without_opening_clue_uses_opening_choices(sid):
+# ---- T-29 백엔드 리뷰: 첫 대사에서 첫 단서 공개, 단서 없는 응답 처리, 전체 흐름 ----------------------
+RISK_IDS = [k for k, s in S.items() if s.get("kind") == "risk"]
+
+
+@pytest.mark.parametrize("sid", RISK_IDS)
+def test_start_reveals_first_clue(sid):
     s = S[sid]
     r = PracticeEngine(FakeProvider("x")).start(sid)
-    assert r.revealed_clue_ids == [] and r.target_clue_id is None
-    assert {c.kind: c.text for c in r.choices} == s["opening_choices"]
-    # 첫 턴에서는 첫 번째 단서가 드러난다 (모델이 실패해도 고정 대사로)
-    t = PracticeEngine(FakeProvider("not json")).turn(TurnRequest(scenario_id=sid, messages=[
-        Message(role="ai", text=s["opening_line"]), Message(role="child", text=s["opening_choices"]["correct"])]))
-    assert t.revealed_clue_ids == [s["clues"][0]["id"]]
+    first = s["clues"][0]["id"]
+    assert r.revealed_clue_ids == [first] and r.target_clue_id == first
+    if s.get("opening_choices"):
+        assert {c.kind: c.text for c in r.choices} == s["opening_choices"]
 
 
-def test_variant_opening_must_not_leak_first_clue():
-    s = S["identity_phone_senior_01"]
-    v = base_as_variant(s).model_dump()
-    v["opening_line"] = "야, 네 이름으로 휴대폰 하나만 개통해 줘."
-    from app.schemas import Variant
-    assert any(p.startswith("opening_leak:lend_identity") for p in check_variant(s, Variant(**v)))
-    assert check_variant(s, base_as_variant(s)) == []
+@pytest.mark.parametrize("sid", RISK_IDS)
+def test_turn_without_any_clue_regenerates(sid):
+    """드러난 단서가 하나도 없을 때 모델이 단서를 빠뜨리면 다시 생성하고, 그래도 없으면 준비된 단서 대사."""
+    s = S[sid]
+    no_clue = json.dumps({"reply": "그렇구나. 더 궁금한 거 있어?", "revealed_clue_ids": [],
+                          "choices": {"correct": "이상해서 안 할래.", "doubtful": "좀 이상한데 해 볼게.",
+                                      "other": "좋아, 할게."}}, ensure_ascii=False)
+    p = FakeProvider(no_clue)
+    t = PracticeEngine(p).turn(TurnRequest(scenario_id=sid, revealed_clue_ids=[], messages=[
+        Message(role="ai", text="안녕"), Message(role="child", text="응?")]))
+    assert p.calls == 2 and t.source == "fallback" and len(t.revealed_clue_ids) == 1
+
+
+def _child(choice, target):
+    return Message(role="child", text=choice.text, choice_kind=choice.kind, clue_id=target)
+
+
+@pytest.mark.parametrize("sid", RISK_IDS)
+def test_flow_start_correct_judge_feedback(sid):
+    """start → 첫 선택(correct) → judge → feedback: 백엔드는 correct 에서 연습을 끝내므로, 첫 단서는 '찾음'."""
+    s = S[sid]
+    eng, judge = PracticeEngine(FakeProvider("x")), Judge(FakeProvider("x"), S)
+    st = eng.start(sid)
+    pick = next(c for c in st.choices if c.kind == "correct")
+    msgs = [Message(role="ai", text=st.reply), _child(pick, st.target_clue_id)]
+    j = judge.judge(JudgeRequest(scenario_id=sid, messages=msgs, revealed_clue_ids=st.revealed_clue_ids))
+    first = s["clues"][0]["id"]
+    assert j.source == "choices"
+    assert {r.clue_id: r.result for r in j.results}[first] == "found"
+    assert all(r.result == "not_shown" for r in j.results if r.clue_id != first)
+    fb = judge.feedback(FeedbackRequest(scenario_id=sid, results=j.results))
+    assert [c.clue_id for c in fb.cards] == [first] and fb.cards[0].result == "found"
+
+
+@pytest.mark.parametrize("sid", RISK_IDS)
+def test_flow_start_other_turn_judge_feedback(sid):
+    """start → 첫 선택(other) → turn(다음 단서) → judge → feedback."""
+    s = S[sid]
+    eng, judge = PracticeEngine(FakeProvider("x")), Judge(FakeProvider("x"), S)
+    st = eng.start(sid)
+    pick = next(c for c in st.choices if c.kind == "other")
+    msgs = [Message(role="ai", text=st.reply), _child(pick, st.target_clue_id)]
+    tr = eng.turn(TurnRequest(scenario_id=sid, messages=msgs, revealed_clue_ids=st.revealed_clue_ids))
+    assert tr.status == "ok" and len(tr.revealed_clue_ids) == 2 and len(tr.choices) == 3
+    msgs.append(Message(role="ai", text=tr.reply))
+    j = judge.judge(JudgeRequest(scenario_id=sid, messages=msgs, revealed_clue_ids=tr.revealed_clue_ids))
+    res = {r.clue_id: r.result for r in j.results}
+    assert res[s["clues"][0]["id"]] == "missed"
+    assert sum(v != "not_shown" for v in res.values()) == 2
+    fb = judge.feedback(FeedbackRequest(scenario_id=sid, results=j.results))
+    assert len(fb.cards) == 2
 
 
 # ---- T-29 검수 v2: 아이의 말에 맞는 단서로 이어 가기 (모델이 실패했을 때도) --------------------

@@ -22,16 +22,17 @@
         "tone": "친구끼리 반말"
       },
       "child_setup": "같은 반 친구가 메신저로 수학 숙제를 대신 해 달라고 해요.",
-      "opening_line": "야, 너 수학 잘하잖아. 부탁 하나만 들어줄래?",
+      "opening_line": "야, 너 수학 잘하잖아. 내 수학 숙제 좀 대신 해 줘.",
       "opening_choices": {
-        "correct": "무슨 부탁인지 먼저 듣고 정할게.",
-        "doubtful": "좀 걱정되지만, 일단 도와줄게.",
-        "other": "응, 뭐든 해 줄게. 말만 해."
+        "correct": "숙제를 대신 해 주는 건 안 돼. 같이 풀자.",
+        "doubtful": "좀 부담되긴 하는데, 이번만 대신 해 줄게.",
+        "other": "응, 그 정도는 내가 대신 해 줄게."
       },
       "clues": [
         {
           "id": "burdensome_request",
-          "reveal_when": "아이가 무슨 부탁인지 물으면",
+          "at_opening": true,
+          "reveal_when": "첫 대사에서 바로",
           "reveal_line": "내 수학 숙제 좀 대신 해 줘. 다섯 장밖에 안 돼."
         },
         {
@@ -174,16 +175,17 @@
         "tone": "친구끼리 반말"
       },
       "child_setup": "같은 학원 친구가 메신저로 용돈을 빌려 달라고 해요.",
-      "opening_line": "나 용돈 다 써서 큰일 났어. 너 혹시 용돈 남았어?",
+      "opening_line": "나 용돈 다 써서 큰일 났어. 3만 원만 빌려줘, 다음 주에 꼭 갚을게.",
       "opening_choices": {
-        "correct": "왜 필요한지 먼저 듣고 정할게.",
-        "doubtful": "좀 걱정되지만, 남은 거 있으면 줄게.",
-        "other": "응, 얼마든지 줄게. 말만 해."
+        "correct": "미안하지만 돈은 빌려줄 수 없어.",
+        "doubtful": "좀 부담되긴 하는데, 이번만 빌려줄게.",
+        "other": "응, 3만 원 바로 보내 줄게."
       },
       "clues": [
         {
           "id": "burdensome_request",
-          "reveal_when": "아이가 왜 묻는지 물으면",
+          "at_opening": true,
+          "reveal_when": "첫 대사에서 바로",
           "reveal_line": "3만 원만 빌려줘. 다음 주에 꼭 갚을게."
         },
         {
@@ -326,16 +328,17 @@
         "tone": "친구끼리 반말"
       },
       "child_setup": "같은 게임 길드 친구가 귓속말로 게임 스킨을 사 달라고 해요.",
-      "opening_line": "이번에 새로 나온 스킨 봤어? 나 부탁 하나만 하자.",
+      "opening_line": "이번에 새로 나온 스킨 봤어? 나 그거 너무 갖고 싶은데, 네 용돈으로 사 줘.",
       "opening_choices": {
-        "correct": "무슨 부탁인지 먼저 듣고 정할게.",
-        "doubtful": "좀 걱정되지만, 일단 도와줄게.",
-        "other": "응, 뭐든 해 줄게. 말만 해."
+        "correct": "내 용돈으로 네 스킨 사 주는 건 안 돼.",
+        "doubtful": "좀 부담되긴 하는데, 이번만 사 줄게.",
+        "other": "응, 그 정도는 내가 사 줄게."
       },
       "clues": [
         {
           "id": "burdensome_request",
-          "reveal_when": "아이가 무슨 부탁인지 물으면",
+          "at_opening": true,
+          "reveal_when": "첫 대사에서 바로",
           "reveal_line": "나 이 스킨 너무 갖고 싶은데, 네 용돈으로 사 줘. 나중에 갚을게."
         },
         {
@@ -471,16 +474,17 @@
         "tone": "친구끼리 반말"
       },
       "child_setup": "같은 학원 친구가 메신저로 학원을 빠질 테니 출석 부를 때 대신 대답해 달라고 해요.",
-      "opening_line": "나 학원 빠질 건데, 부탁 하나만 하자.",
+      "opening_line": "나 학원 빠질 건데, 출석 부를 때 내 이름 나오면 대신 대답해 줘.",
       "opening_choices": {
-        "correct": "무슨 부탁인지 먼저 듣고 정할게.",
-        "doubtful": "좀 걱정되지만, 일단 도와줄게.",
-        "other": "응, 뭐든 해 줄게. 말만 해."
+        "correct": "대신 대답하는 건 거짓말이라 못 해.",
+        "doubtful": "좀 걱정되긴 하는데, 이번만 대답해 줄게.",
+        "other": "응, 이름 나오면 내가 대답해 줄게."
       },
       "clues": [
         {
           "id": "burdensome_request",
-          "reveal_when": "아이가 무슨 부탁인지 물으면",
+          "at_opening": true,
+          "reveal_when": "첫 대사에서 바로",
           "reveal_line": "출석 부를 때 내 이름 나오면 대신 대답해 줘."
         },
         {

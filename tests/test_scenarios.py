@@ -130,15 +130,18 @@ def test_no_real_looking_contacts():
     assert all(d.startswith("example.com") for d in re.findall(r"[\w.-]+\.(?:com|kr|net)\S*", text))
 
 
-# ---- T-29 검수 반영: 첫 대사는 상황 시작만, 단서는 다음 대사부터 -------------------------
-NEW_AREAS = ("identity_lending", "friend_pressure")
+# ---- T-29 백엔드 리뷰: 첫 대사에서 첫 단서를 드러낸다 ----------------------------------
+# 백엔드는 아이가 correct(의심·거절)를 고르면 그 자리에서 연습을 끝낸다. 그래서 첫 선택지부터 단서에 반응해야 한다.
+@pytest.mark.parametrize("s", SCENARIOS, ids=lambda s: s["id"])
+def test_first_clue_is_shown_at_opening(s):
+    from app.scenarios import has_clue_keyword
+    first = s["clues"][0]
+    assert first.get("at_opening"), "첫 단서는 첫 대사에서 드러나야 함"
+    assert has_clue_keyword(s["opening_line"], first["id"])
 
 
-@pytest.mark.parametrize("s", [s for s in SCENARIOS if s["_area"] in NEW_AREAS], ids=lambda s: s["id"])
-def test_new_area_opening_has_no_clue(s):
-    """첫 대사와 단서 1이 겹치지 않게: 첫 대사에는 단서가 없고, 시작 선택지(opening_choices)가 있다."""
-    assert not any(c.get("at_opening") for c in s["clues"])
-    oc = s["opening_choices"]
-    assert set(oc) == {"correct", "doubtful", "other"} and all(v.endswith(".") for v in oc.values())
-    first = s["clues"][0]["reveal_line"]
-    assert first not in s["opening_line"] and s["opening_line"] not in first
+@pytest.mark.parametrize("s", [s for s in SCENARIOS if s.get("opening_choices")], ids=lambda s: s["id"])
+def test_opening_choices_follow_choice_rules(s):
+    """시나리오 전용 시작 선택지도 모델 선택지와 같은 규칙(정답은 분명한 거절, 길이 비슷 등)을 지킨다."""
+    from app.choices import choice_problem
+    assert choice_problem(s["opening_choices"]) is None

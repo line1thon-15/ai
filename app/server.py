@@ -156,16 +156,22 @@ class _Handler(BaseHTTPRequestHandler):
         given = self.headers.get(TOKEN_HEADER, "")
         return hmac.compare_digest(given.encode(), self.app.internal_token.encode())
 
-    def _read_json(self):
+    def _read_body(self) -> bytes:
+        """본문을 먼저 끝까지 읽는다. 읽지 않은 채로 401 등을 보내고 연결을 닫으면
+        Windows 에서는 상대가 응답을 받기 전에 연결이 끊긴다(WinError 10053)."""
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             raise _HttpError(400, "bad_request") from None
-        if length <= 0:
-            raise _HttpError(400, "invalid_json")
         if length > MAX_BODY_BYTES:
+            self.close_connection = True  # 너무 큰 본문은 읽지 않고 연결을 닫는다
             raise _HttpError(413, "payload_too_large")
-        raw = self.rfile.read(length)
+        return self.rfile.read(length) if length > 0 else b""
+
+    @staticmethod
+    def _parse_json(raw: bytes):
+        if not raw:
+            raise _HttpError(400, "invalid_json")
         try:
             return json.loads(raw)
         except ValueError:  # JSONDecodeError, UnicodeDecodeError 포함
@@ -179,9 +185,10 @@ class _Handler(BaseHTTPRequestHandler):
                 known = any(p == path for (_, p) in ROUTES)
                 raise _HttpError(405, "method_not_allowed") if known else _HttpError(404, "not_found")
             needs_auth, handler = route
+            raw = self._read_body() if method == "POST" else b""
             if needs_auth and not self._authorized():
                 raise _HttpError(401, "unauthorized")
-            body = self._read_json() if method == "POST" else None
+            body = self._parse_json(raw) if method == "POST" else None
             status, payload = handler(self.app, body)
         except _HttpError as e:
             status, payload = e.status, {"error": e.code}
