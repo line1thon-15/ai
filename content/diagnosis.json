@@ -1,85 +1,67 @@
 {
-  "version": "v1",
-  "note": "T-29 진단 3문항 (콘텐츠). 영역마다 1문항. 점수·시작 난이도 계산은 백엔드가 한다 (위험한 답 개수 → 난이도). 문항 순서·문구는 백엔드 diagnosis.json 과 맞춰 쓴다.",
+  "version": "v2",
+  "note": "T-29 진단 3문항. 피그마 Y2-1 '나를 알아보는 3가지 질문'(자기 평가, 정답 없음). 형식은 백엔드와 같은 {id, text, options:[{id, text, score}]}. 점수가 높을수록 안전한 편(그래요 0 / 가끔 1 / 아니에요 2). 점수 합계로 시작 난이도를 정하는 계산은 백엔드가 한다.",
   "questions": [
     {
-      "id": "diag_scam_01",
-      "area": "scam",
-      "clue_ids": [
-        "too_good_pay",
-        "urgency"
-      ],
-      "situation": "모르는 사람이 SNS 쪽지로 말을 걸었어요. \"하루 두 시간만 하면 20만 원 줘요. 오늘까지만 뽑아요.\"",
-      "question": "나라면 어떻게 할까요?",
+      "id": "q1",
+      "text": "모르는 사람이 말을 걸면 대답해요",
       "options": [
         {
-          "id": "a",
-          "text": "좋은 기회니까 바로 한다고 해요.",
-          "risky": true
+          "id": "q1_a",
+          "text": "그래요",
+          "score": 0
         },
         {
-          "id": "b",
-          "text": "무슨 일인지 물어보고 혼자 정해요.",
-          "risky": true
+          "id": "q1_b",
+          "text": "가끔",
+          "score": 1
         },
         {
-          "id": "c",
-          "text": "이상하다고 생각하고 어른에게 물어봐요.",
-          "risky": false
+          "id": "q1_c",
+          "text": "아니에요",
+          "score": 2
         }
       ]
     },
     {
-      "id": "diag_identity_01",
-      "area": "identity_lending",
-      "clue_ids": [
-        "lend_identity",
-        "too_good_pay"
-      ],
-      "situation": "아는 선배가 말했어요. \"네 이름으로 휴대폰 하나만 만들어 줘. 해 주면 10만 원 줄게.\"",
-      "question": "나라면 어떻게 할까요?",
+      "id": "q2",
+      "text": "친구 부탁은 거절하기 어려워요",
       "options": [
         {
-          "id": "a",
-          "text": "선배 부탁이니까 내 이름으로 휴대폰 만들어 줘요.",
-          "risky": true
+          "id": "q2_a",
+          "text": "그래요",
+          "score": 0
         },
         {
-          "id": "b",
-          "text": "돈을 먼저 받으면 내 이름으로 휴대폰 만들어 줘요.",
-          "risky": true
+          "id": "q2_b",
+          "text": "가끔",
+          "score": 1
         },
         {
-          "id": "c",
-          "text": "내 이름으로 된 휴대폰은 빌려주지 않고 부모님께 알려요.",
-          "risky": false
+          "id": "q2_c",
+          "text": "아니에요",
+          "score": 2
         }
       ]
     },
     {
-      "id": "diag_friend_01",
-      "area": "friend_pressure",
-      "clue_ids": [
-        "burdensome_request",
-        "friendship_threat"
-      ],
-      "situation": "친구가 숙제를 대신 해 달라고 했어요. 싫다고 했더니 \"안 해 주면 너랑 안 놀 거야.\"라고 해요.",
-      "question": "나라면 어떻게 할까요?",
+      "id": "q3",
+      "text": "돈이나 물건 이야기는 헷갈려요",
       "options": [
         {
-          "id": "a",
-          "text": "친구를 잃기 싫어서 숙제를 대신 해 줘요.",
-          "risky": true
+          "id": "q3_a",
+          "text": "그래요",
+          "score": 0
         },
         {
-          "id": "b",
-          "text": "이번 한 번만 해 주고 다음부터는 안 해요.",
-          "risky": true
+          "id": "q3_b",
+          "text": "가끔",
+          "score": 1
         },
         {
-          "id": "c",
-          "text": "싫다고 거절하고, 계속 괴롭히면 선생님께 알려요.",
-          "risky": false
+          "id": "q3_c",
+          "text": "아니에요",
+          "score": 2
         }
       ]
     }

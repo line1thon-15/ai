@@ -6,7 +6,7 @@
 |---|---|
 | `clues.json` | 위험 신호(단서) 12개: 이름, 뜻, 찾았다고 보는 기준, 안전한 대처, 힌트, 아이 말의 신호(`triggers`), 선택지 예시, 출처 |
 | `scenarios/*.json` | 영역별 위험 상황 4개 + 정상 상황 8개 |
-| `diagnosis.json` | 진단 3문항 (영역마다 1문항, 안전한 답 1개). 점수 계산은 백엔드 |
+| `diagnosis.json` | 처음 설정의 진단 3문항 (자기 평가, 정답 없음). 백엔드 형식 `{id, text, options:[{id, text, score}]}`, 그래요 0 / 가끔 1 / 아니에요 2. 합계 → 시작 난이도는 백엔드 |
 | `safety_cases.json` · `safety_messages.json` | 안전 필터 기준 사례 · 안내 문구와 상담 전화번호 |
 
 ## 시나리오 목록
