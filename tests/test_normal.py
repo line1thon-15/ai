@@ -32,7 +32,10 @@ class Boom:
 # ---- 정상 상황: 출제 -----------------------------------------------------------
 
 def test_normal_situations_are_registered():
-    assert len(NORMAL_IDS) == 8
+    # T-29: 영역 3개 × 위험 시나리오 4개 × 정상 상황 2개
+    assert len(NORMAL_IDS) == 24
+    for area in ("scam", "identity_lending", "friend_pressure"):
+        assert len([n for n in NORMAL_IDS if SCENARIOS[n]["area"] == area]) == 8
     for nid in NORMAL_IDS:
         n = SCENARIOS[nid]
         assert n["clues"] == [] and n["ai_role"]["name"] and n["child_setup"] and n["base_scenario_id"]

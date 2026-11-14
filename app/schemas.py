@@ -58,6 +58,13 @@ class ClueVariant(BaseModel):
     reveal_line: str = Field(min_length=1, max_length=200)
 
 
+class OpeningChoices(BaseModel):
+    """첫 단서에 맞춘 시작 선택지 (정답·의심·다른 답)."""
+    correct: str = Field(min_length=1, max_length=60)
+    doubtful: str = Field(min_length=1, max_length=60)
+    other: str = Field(min_length=1, max_length=60)
+
+
 class Variant(BaseModel):
     base_scenario_id: str = Field(min_length=1, max_length=64)
     platform: str = Field(min_length=1, max_length=40)
@@ -68,6 +75,8 @@ class Variant(BaseModel):
     opening_line: str = Field(min_length=1, max_length=200)
     ai_role: AiRole
     clues: list[ClueVariant] = Field(default_factory=list, max_length=10)  # 정상 상황 변형은 빈 목록
+    # 변형된 상황에 맞춘 시작 선택지. 없으면 첫 단서의 선택지 예시를 쓴다 (원본 시나리오의 선택지는 쓰지 않음)
+    opening_choices: OpeningChoices | None = None
 
 
 class VariantRequest(BaseModel):

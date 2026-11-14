@@ -18,7 +18,7 @@ from .hints import hint_text
 from .jsonutil import clean_text, parse_json_object, split_sentences
 from .providers import LLMProvider, QuotaExceeded
 from .safety import MESSAGES, check_input, check_output, mask_pii
-from .scenarios import InvalidVariant, UnknownScenario, has_clue_keyword, normal_risk_hits, resolve  # noqa: F401
+from .scenarios import CLUE_DEFS, InvalidVariant, UnknownScenario, has_clue_keyword, normal_risk_hits, resolve  # noqa: F401
 from .schemas import StartResponse, TurnRequest, TurnResponse, Variant
 
 # 안내 문구와 전화번호는 content/safety_messages.json 에서 고친다 (팀 확인 필요)
@@ -54,7 +54,9 @@ class PracticeEngine:
             child_setup=s["child_setup"],
             revealed_clue_ids=opening,
             target_clue_id=target,
-            choices=arrange(_templates(s, target)),
+            # 시나리오에 첫 단서에 맞춘 시작 선택지(opening_choices)가 있으면 그것, 없으면 단서의 선택지 예시
+            choices=arrange(dict(s["opening_choices"]) if target is not None and s.get("opening_choices")
+                            else _templates(s, target)),
             choices_source="template",
             hint=hint_text(s, target, hint_level),
         )
@@ -82,6 +84,7 @@ class PracticeEngine:
         masked = check.action == "mask"
 
         normal = s.get("kind") == "normal"
+        must_reveal = not normal and must_reveal_now(s, revealed, req.messages)
         prompt = self._build_normal_prompt(s, req) if normal else self._build_prompt(s, revealed, req)
         for _ in range(MAX_ATTEMPTS):
             try:
@@ -97,6 +100,10 @@ class PracticeEngine:
             # 대사에 그 단서의 말이 실제로 있어야 '드러냈다'고 인정한다. 한 턴에 새 단서는 1개만 (시나리오 순서로 첫 번째)
             new_ids = [i for i in valid_ids if i in claimed and i not in revealed and has_clue_keyword(full_reply, i)]
             keep, dropped = new_ids[:1], new_ids[1:]
+            # 단서 없이 대화만 이어지는 턴은 연달아 1번까지만 허용한다 (아이의 질문에 답하는 턴).
+            # 아직 드러난 단서가 없거나, 바로 앞 턴도 단서가 없었으면 → 다시 생성 / 준비된 단서 대사
+            if not normal and not keep and must_reveal:
+                continue
             reply = shorten(full_reply, keep, dropped)
             if (reply is None or len(reply) > MAX_REPLY_CHARS or any(has_clue_keyword(reply, d) for d in dropped)
                     or not check_output(reply, "roleplay").allowed):
@@ -107,16 +114,19 @@ class PracticeEngine:
             return _response(s, "ok", reply, revealed + keep, target, validate_texts(choice_data),
                              masked=masked, source="model")
 
-        return self._fallback(s, revealed, latest, masked)
+        return self._fallback(s, revealed, latest, masked, req.messages[-1].text)
 
-    def _fallback(self, s, revealed, latest, masked) -> TurnResponse:
-        """모델이 실패하면 시나리오의 단서 대사를 순서대로 쓴다 (시연이 끊기지 않게)."""
-        if s.get("kind") == "normal":
-            return _response(s, "ok", NORMAL_FALLBACK, [], None, None, masked=masked, source="fallback")
-        for clue in s["clues"]:
-            if clue["id"] not in revealed:
-                return _response(s, "ok", clue["reveal_line"], revealed + [clue["id"]], clue["id"], None,
-                                 masked=masked, source="fallback")
+    def _fallback(self, s, revealed, latest, masked, child_text: str = "") -> TurnResponse:
+        """모델이 실패하면 시나리오의 단서 대사를 쓴다 (시연이 끊기지 않게).
+        아이의 말이 어떤 단서의 '드러낼 때'에 맞으면(triggers) 그 단서를, 아니면 시나리오 순서대로 다음 단서를 쓴다.
+        예: '부모님께 물어볼게요' → 비밀 요구, '위험하지 않아요?' → 안심시키기, '생각해 볼게요' → 재촉."""
+        if s.get("kind") == "normal":  # 정상 상황마다 상황에 맞는 고정 대사가 있으면 그걸 쓴다 (친구 사이 반말 등)
+            return _response(s, "ok", s.get("fallback_line") or NORMAL_FALLBACK, [], None, None, masked=masked,
+                             source="fallback")
+        clue = next_clue(s, revealed, child_text)
+        if clue is not None:
+            return _response(s, "ok", clue["reveal_line"], revealed + [clue["id"]], clue["id"], None,
+                             masked=masked, source="fallback")
         return _response(s, "ok", CLOSING_LINE, revealed, latest, None, masked=masked, source="fallback")
 
     # ---- 프롬프트 ---------------------------------------------------------
@@ -165,7 +175,8 @@ class PracticeEngine:
 
         def clue_line(c: dict) -> str:
             d = self.clue_defs[c["id"]]
-            return f"- {c['id']}: {d['description']} / 드러낼 때: {c['reveal_when']} / 예시 대사: {c['reveal_line']}"
+            return (f"- {c['id']}: {d['description']} / 드러낼 때: {c['reveal_when']}"
+                    f" (아이가 이런 말을 하면: {', '.join(d.get('triggers', [])[:4])}) / 예시 대사: {c['reveal_line']}")
 
         remaining = [c for c in s["clues"] if c["id"] not in revealed]
         done = [c for c in s["clues"] if c["id"] in revealed]
@@ -298,3 +309,37 @@ def _parse(raw: str, valid_ids: list[str]):
     ids = data.get("revealed_clue_ids")
     ids = [i for i in ids if isinstance(i, str) and i in valid_ids] if isinstance(ids, list) else []
     return reply, list(dict.fromkeys(ids)), data.get("choices")
+
+
+def next_clue(s: dict, revealed: list[str], child_text: str = "") -> dict | None:
+    """아직 안 드러난 단서 중 아이의 말에 맞는 것 (없으면 시나리오 순서로 첫 번째)."""
+    remaining = [c for c in s["clues"] if c["id"] not in revealed]
+    for c in remaining:
+        if any(w in child_text for w in CLUE_DEFS[c["id"]].get("triggers", [])):
+            return c
+    return remaining[0] if remaining else None
+
+
+MAX_CLUELESS_TURNS = 1  # 단서 없이 넘어가도 되는 AI 턴 수 (연달아)
+
+
+def must_reveal_now(s: dict, revealed: list[str], messages) -> bool:
+    """이번 턴에 새 단서를 꼭 드러내야 하는지.
+    - 남은 단서가 없으면 아니다. 아직 드러난 단서가 하나도 없으면 그렇다.
+    - 첫 대사 뒤 AI 대사를 차례로 보며, 새 단서의 말이 없던 대사가 끝에서부터 연달아 몇 번인지 센다.
+      그 수가 MAX_CLUELESS_TURNS 이상이면 이번에는 꼭 드러낸다 (단서 없는 대화가 반복되지 않게).
+      백엔드가 대화 전체를 보내 주므로 따로 상태를 저장하지 않고 대사 글에서 계산한다."""
+    if all(c["id"] in revealed for c in s["clues"]):
+        return False
+    if not revealed:
+        return True
+    seen = {c["id"] for c in s["clues"] if c.get("at_opening")}
+    clueless = 0
+    for m in [m for m in messages if m.role == "ai"][1:]:  # 첫 대사는 빼고
+        new = {c["id"] for c in s["clues"] if c["id"] not in seen and has_clue_keyword(m.text, c["id"])}
+        if new:
+            seen |= new
+            clueless = 0
+        else:
+            clueless += 1
+    return clueless >= MAX_CLUELESS_TURNS

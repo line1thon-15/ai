@@ -4,8 +4,8 @@
     (창 2) python scripts/check_server.py          # 요약만
            python scripts/check_server.py --full   # 응답 JSON 전체도 출력
 
-토큰과 포트는 ai/.env 에서 읽는다. Gemini 를 쓰는 요청은 9번 정도다
-(다음 턴 3, 변형 2, 피드백 2, 심화 1, 요약 1. 안전 확인 요청은 모델을 부르지 않는다).
+토큰과 포트는 ai/.env 에서 읽는다. Gemini 를 쓰는 요청은 12번 정도다
+(다음 턴 6, 변형 2, 피드백 2, 심화 1, 요약 1. 첫 대사·안전 확인 요청은 모델을 부르지 않는다).
 """
 import json
 import os
@@ -27,6 +27,11 @@ CHECKS = [
     ("다음 턴: 알바 사기", "POST", "/internal/v1/practice/turn", "contracts/practice.turn.request.json", "source=model"),
     ("다음 턴: 게임 아이템 사기", "POST", "/internal/v1/practice/turn", "samples/turn.game.json", "source=model, 새 단서 1개"),
     ("다음 턴: 정상 상황", "POST", "/internal/v1/practice/turn", "samples/turn.normal.json", "source=model, 단서 없음"),
+    ("첫 대사: 명의 빌려주기 (T-29)", "POST", "/internal/v1/practice/start", {"scenario_id": "identity_dm_account_01"}, "선택지 3개"),
+    ("다음 턴: 명의 빌려주기 (T-29)", "POST", "/internal/v1/practice/turn", "samples/turn.identity.json", "source=model, 새 단서 1개"),
+    ("첫 대사: 친구의 무리한 부탁 (T-29)", "POST", "/internal/v1/practice/start", {"scenario_id": "friend_money_01"}, "선택지 3개"),
+    ("다음 턴: 친구의 무리한 부탁 (T-29)", "POST", "/internal/v1/practice/turn", "samples/turn.friend.json", "source=model, 새 단서 1개"),
+    ("다음 턴: 친구 사이 정상 상황 (T-29)", "POST", "/internal/v1/practice/turn", "samples/turn.friend_normal.json", "source=model, 단서 없음"),
     ("안전 확인: 자해 표현", "POST", "/internal/v1/practice/turn", "samples/turn.safe_reply.json", "status=safe_reply, 선택지 0개"),
     ("변형 생성", "POST", "/internal/v1/practice/variant", "contracts/practice.variant.request.json", "source=model"),
     ("정상 상황 생성 (T-34)", "POST", "/internal/v1/practice/variant", "contracts/practice.normal.variant.request.json", "source=model"),
