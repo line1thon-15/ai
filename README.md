@@ -95,7 +95,7 @@ cp .env.example .env      # .env 는 커밋하지 않기
 |---|---|
 | `AI_INTERNAL_TOKEN` | 백엔드가 보내는 인증 토큰 (없으면 서버가 뜨지 않음) |
 | `AI_PROVIDER` | `fake`: 모델 없이 고정 답(테스트용) / `gemini`: Gemini 사용 (API 키 필요) |
-| `GEMINI_API_KEY` · `GEMINI_MODEL` | Gemini 키(`gemini`일 때 필수) · 모델 이름 (기본 `gemini-2.5-flash`) |
+| `GEMINI_API_KEY` · `GEMINI_MODEL` | Gemini 키(`gemini`일 때 필수) · 모델 이름 (기본 `gemini-3.8-flash`. `gemini-2.5-flash`는 새 키에서 404가 나서 기존 사용자만 가능) |
 | `AI_PORT` · `AI_HOST` | 포트와 주소 (기본 `8081` · `127.0.0.1`) |
 
 ```bash
@@ -180,7 +180,7 @@ ai /internal/v1/summary           contracts/summary.request.json            # �
 | 기술 | 선택 이유 |
 |---|---|
 | Python 3.11 | AI 기능 구현과 API 연동에 적합하며, Gemini 공식 SDK 지원 |
-| Gemini `gemini-2.5-flash` (`google-genai`) | 개발 단계 모델. 한국어 대화가 자연스럽고 응답이 빠름 |
+| Gemini `gemini-3.8-flash` (`google-genai`) | 개발 단계 모델. 한국어 대화가 자연스러움. 짧은 대사라 생각(thinking)은 가장 낮은 단계(`low`)로 줄여 응답 시간을 줄임 |
 | 표준 라이브러리 HTTP 서버 | 백엔드만 부르는 내부 서버라 프레임워크 없이 가볍게 |
 | `pydantic` | 요청·응답 검증 |
 | `pytest` + GitHub Actions | push·PR마다 자동 테스트 |

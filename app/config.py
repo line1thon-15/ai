@@ -11,6 +11,8 @@ class ConfigError(RuntimeError):
 
 DEFAULT_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 PLACEHOLDER = "여기에"  # .env 에 안내 문구가 그대로 남아 있는지 확인용
+# 2.5 Flash 는 새 사용자(새 키)에게 열리지 않아서(404) 기본값을 3.8 Flash 로 둔다. 2.5 를 쓰려면 GEMINI_MODEL 로 지정
+DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 
 
 def load_dotenv(path=DEFAULT_ENV_FILE, environ=None) -> None:
@@ -70,5 +72,5 @@ class Config:
             internal_token=token,
             provider=provider,
             gemini_api_key=key,
-            gemini_model=env.get("GEMINI_MODEL") or "gemini-2.5-flash",
+            gemini_model=env.get("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL,
         )

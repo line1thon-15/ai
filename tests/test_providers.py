@@ -76,10 +76,21 @@ def test_gemini_request_shape(fake_sdk):
     assert fake_sdk["config"]["automatic_function_calling"].kw == {"disable": True}
 
 
-def test_other_models_get_no_thinking_setting(fake_sdk):
-    GeminiProvider(api_key="k", model="gemini-3-flash").generate("p")
-    assert "thinking_config" not in fake_sdk["config"]
+def test_gemini3_uses_lowest_thinking_level(fake_sdk):
+    """3.8 Flash 는 생각을 끌 수 없고 'minimal'도 오류라, 가장 낮은 'low'로 줄인다."""
+    GeminiProvider(api_key="k", model="gemini-3.8-flash").generate("p")
+    assert fake_sdk["config"]["thinking_config"].kw == {"thinking_level": "low"}
     assert "response_mime_type" not in fake_sdk["config"]
+
+
+def test_other_models_get_no_thinking_setting(fake_sdk):
+    GeminiProvider(api_key="k", model="gemini-pro-x").generate("p")
+    assert "thinking_config" not in fake_sdk["config"]
+
+
+def test_default_model_is_38_flash():
+    from app.config import DEFAULT_GEMINI_MODEL
+    assert DEFAULT_GEMINI_MODEL == "gemini-3.8-flash"
 
 
 def test_empty_text_becomes_empty_string(fake_sdk):
