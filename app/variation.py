@@ -49,6 +49,9 @@ class Variator:
         axes = base["variation_axes"]
         for field in ("platform", "tone", "context"):
             value = getattr(req, field)
+            # 정상 상황은 자기 플랫폼을 그대로 쓰므로, 부모 시나리오의 축에 없어도 원래 플랫폼이면 통과
+            if field == "platform" and base.get("kind") == "normal" and value == base["platform"]:
+                continue
             if value is not None and value not in axes[field]:
                 raise InvalidAxis(field)
 

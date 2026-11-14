@@ -100,6 +100,10 @@ class PracticeEngine:
             # 대사에 그 단서의 말이 실제로 있어야 '드러냈다'고 인정한다. 한 턴에 새 단서는 1개만 (시나리오 순서로 첫 번째)
             new_ids = [i for i in valid_ids if i in claimed and i not in revealed and has_clue_keyword(full_reply, i)]
             keep, dropped = new_ids[:1], new_ids[1:]
+            # 모델이 드러냈다고 말하지 않았어도 대사에 남은 단서의 말이 있으면 아이에게는 보인다 → 그 문장도 뺀다
+            # (안 그러면 화면에는 나왔는데 판별은 not_shown 이 되고, 다음 턴에 같은 단서가 또 나온다)
+            dropped += [i for i in valid_ids if i not in revealed and i not in keep and i not in dropped
+                        and has_clue_keyword(full_reply, i)]
             # 단서 없이 대화만 이어지는 턴은 연달아 1번까지만 허용한다 (아이의 질문에 답하는 턴).
             # 아직 드러난 단서가 없거나, 바로 앞 턴도 단서가 없었으면 → 다시 생성 / 준비된 단서 대사
             if not normal and not keep and must_reveal:
@@ -334,9 +338,16 @@ def must_reveal_now(s: dict, revealed: list[str], messages) -> bool:
     if not revealed:
         return True
     seen = {c["id"] for c in s["clues"] if c.get("at_opening")}
+    ai_lines = [m for m in messages if m.role == "ai"]
+    # 첫 대사가 대화에 들어 있으면 뺀다 (백엔드가 첫 대사를 빼고 보내도 맞게 세도록, 글이 같을 때만)
+    if ai_lines and ai_lines[0].text.strip() == s["opening_line"].strip():
+        ai_lines = ai_lines[1:]
     clueless = 0
-    for m in [m for m in messages if m.role == "ai"][1:]:  # 첫 대사는 빼고
-        new = {c["id"] for c in s["clues"] if c["id"] not in seen and has_clue_keyword(m.text, c["id"])}
+    for m in ai_lines:
+        # 백엔드가 '드러났다'고 알려 준 단서(revealed)의 말이 처음 나온 대사만 단서를 드러낸 대사로 센다
+        # ('괜찮아요'처럼 아직 안 드러난 단서의 흔한 키워드가 있다고 단서 대사로 치지 않음)
+        new = {c["id"] for c in s["clues"]
+               if c["id"] in revealed and c["id"] not in seen and has_clue_keyword(m.text, c["id"])}
         if new:
             seen |= new
             clueless = 0

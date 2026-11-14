@@ -180,12 +180,13 @@ class _Handler(BaseHTTPRequestHandler):
     def _dispatch(self, method: str):
         path = self.path.split("?", 1)[0]
         try:
+            # 본문은 경로·인증 확인보다 먼저 읽는다 (404·405·401 에서도 Windows 연결 끊김이 생기지 않게)
+            raw = self._read_body() if method == "POST" else b""
             route = ROUTES.get((method, path))
             if route is None:
                 known = any(p == path for (_, p) in ROUTES)
                 raise _HttpError(405, "method_not_allowed") if known else _HttpError(404, "not_found")
             needs_auth, handler = route
-            raw = self._read_body() if method == "POST" else b""
             if needs_auth and not self._authorized():
                 raise _HttpError(401, "unauthorized")
             body = self._parse_json(raw) if method == "POST" else None

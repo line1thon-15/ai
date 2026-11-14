@@ -39,28 +39,44 @@ NORMAL_RISK_PHRASES = (
 STRANGER_PHRASES = ("모르는 사람", "낯선 사람", "모르는 계정", "처음 보는 사람", "오픈채팅")
 
 
-# 위험 단어 뒤 '같은 마디' 안에서 부정하면 안전 안내로 본다 ('고객센터는 비밀번호를 절대 묻지 않아요')
-_NEGATION = ("않", "없", "마세요", "말아", "금지")
+# ---- 정상 상황 위험 요구 검사 ------------------------------------------------------------
+# 부정이 '그 행동'에 붙어 있을 때만 안전 안내로 본다. ('비밀번호를 묻지 않아요' → 안내 / '보증금은 걱정 없어요' → 안내 아님:
+# 없는 건 '걱정'이지 보증금 요구가 아님)
+_ACT = r"(묻|물어보|물어|요구하|요구|달라고\s*하|받|보내|보낼|내|낼|입금하|입금|송금하|송금|이체하|이체|알려\s*주|알려|누르|눌러|설치하|설치|정하|정해|와|오|가져오|가져와|적|쓰|입력하|입력|만나|연락하|연락|빌려\s*주|빌려|하)"
+_SAFETY = re.compile(
+    _ACT + r"\s*(지|진)\s*(않|마|말)"          # 묻지 않아요, 보내지 마세요, 알려 주지 마
+    + r"|안\s*" + _ACT                            # 안 물어봐요, 안 내도 돼요, 안 보낼게요
+    + r"|(필요|일)\s*(는|은|가|이)?\s*없"          # 낼 필요는 없어요, 그럴 일은 없어요
+    + r"|(는|은)\s*(게|거|것)\s*(이\s*)?아니"     # 물어보는 게 아니에요
+    + r"|(달라는|라는|하는|주는|묻는|요구하는)\s+\S+\s*(은|는|이|가)?\s*없"  # 알려 달라는 사람은 없어요
+    + r"|절대\s*(안|하지|묻지|요구하지|받지)"
+)
 # 부정처럼 보여도 실제로는 요구·협박인 표현 ('비밀번호를 알려 주지 않으면 계정이 막혀요')
-_THREAT = ("않으면", "없으면", "안 하면", "안 그러면", "안 주면", "안 보내면")
-# 요구하는 말 (뒤에 '-지 마/-지 않'이 바로 붙으면 그 요구를 부정하는 안내)
+_THREAT = re.compile(r"(않|없|안\s*\S+)으?면|안\s*그러면")
+# 요구하는 말 (바로 앞에 '안'이 있거나, 뒤에 '-지 마/-지 않'이 붙으면 그 요구를 부정하는 안내)
 _REQUEST = ("알려", "보내", "입력", "적어", "말해", "넣어", "눌러", "찍어", "올려", "달라", "해 주", "해 줘", "하세요",
-            "줘", "주세요", "주실", "주면", "줄래")
-_NEGATED_REQUEST = re.compile(r"^\s*(주|해\s*주|해)?\s*지\s*(않|마|말)")
-# 요구하는 말이 '~달라는 사람', '~보내라는 말'처럼 꾸미는 말로 쓰이면 요구가 아니다 (뒤의 부정이 그 말 전체를 부정)
+            "줘", "주세요", "주실", "주면", "줄래", "가져오", "가져와", "들어가", "들어와")
+_NEGATED_REQUEST = re.compile(r"^\s*(주|해\s*주|해|고\s*하)?\s*(지|진)\s*(않|마|말)")
+# 요구하는 말이 '~달라는 사람', '~보내라는 말'처럼 꾸미는 말로 쓰이면 요구가 아니다
 _MODIFIER = re.compile(r"^\s*(달라|주라|해\s*달라|라|으라)?는\s")
 _SENTENCE_END = re.compile(r"[.!?。\n]")
 # 마디 경계: 쉼표나 이어 주는 말 뒤로는 다른 이야기다 ('알려 주세요, 잊지 마세요' 의 '마세요'는 비밀번호와 상관없음)
 _CLAUSE_END = re.compile(r",|，|;| 그리고 | 그런데 | 근데 |지만 |는데 ")
+# 위험 단어 없이 돈을 요구하는 말 ('내일 3만 원만 가져오면 돼요', '돈 먼저 보내 줘')
+_MONEY = re.compile(r"(\d[\d,]*\s*(만\s*)?원|돈)\S*\s*(\S+\s+)?(먼저\s+)?"
+                    r"(가져오|가져와|보내|입금|송금|이체|내|준비)\S{0,3}\s?(주세요|줘|주면|주실|면\s*돼|야\s*(해|돼|합)|라)"
+                    r"|(\d[\d,]*\s*(만\s*)?원|돈)\S*\s*(만\s*)?(줘|주세요|주면)")  # '보내 두었다'처럼 요구가 아닌 말은 제외
 
 
 def _has_live_request(clause: str) -> bool:
-    """마디 안에 부정되지 않은 요구가 있는지 ('알려 주세요' → 있음, '알려 주지 마세요' → 없음)."""
+    """마디 안에 부정되지 않은 요구가 있는지 ('알려 주세요' → 있음, '알려 주지 마세요'·'안 보낼게요' → 없음)."""
     for verb in _REQUEST:
         start = clause.find(verb)
         while start != -1:
             after = clause[start + len(verb):]
-            if not _NEGATED_REQUEST.match(after) and not _MODIFIER.match(after):
+            before = clause[:start].rstrip()
+            negated = _NEGATED_REQUEST.match(after) or before.endswith("안") or _MODIFIER.match(after)
+            if not negated:
                 return True
             start = clause.find(verb, start + 1)
     return False
@@ -69,16 +85,23 @@ def _has_live_request(clause: str) -> bool:
 def _is_safety_notice(tail: str) -> bool:
     """위험 단어 바로 뒤 마디(tail)가 그 단어를 부정하는 안내인지.
     1) 협박('않으면')이 있으면 요구  2) 부정되지 않은 요구('알려 주세요')가 있으면 요구
-    3) 같은 마디 안에 부정('않', '없', '마세요')이 있으면 안내  4) 그 밖에는 요구로 본다."""
+    3) 부정이 행동에 붙어 있으면('묻지 않아요', '안 내도 돼요', '필요 없어요') 안내  4) 그 밖에는 요구로 본다."""
     clause = _CLAUSE_END.split(tail, maxsplit=1)[0]
-    if any(w in clause for w in _THREAT):
+    if _THREAT.search(clause):
         return False
     if _has_live_request(clause):
         return False
-    if any(w in clause for w in _NEGATION):
-        return True
-    # '알려 주면 안 돼요'는 안내, '알려 주면 안 돼?'는 묻는 말이라 요구로 본다
-    return ("안 돼" in clause or "안 되" in clause) and not clause.rstrip().endswith("?")
+    return bool(_SAFETY.search(clause))
+
+
+def _money_request(text: str) -> bool:
+    """위험 단어가 없어도 돈을 요구하는 문장이 있는지 (그 마디에 부정·안전 안내가 있으면 제외)."""
+    for sentence in _SENTENCE_END.split(text):
+        for clause in _CLAUSE_END.split(sentence):
+            m = _MONEY.search(clause)
+            if m and not _SAFETY.search(clause[m.start():]):
+                return True
+    return False
 
 
 def _risky_use(text: str, phrase: str) -> bool:
@@ -107,7 +130,10 @@ def normal_risk_hits(text: str, base: dict | None = None) -> list[str]:
     """정상 상황 글(변형·대사·판정 문구)에 들어간 위험 요구.
     원본에 같은 단어가 있어도 허용하지 않는다. 단어 뒤에서 부정하는 안전 안내만 허용한다
     (백엔드 리뷰: 원본의 '비밀번호를 묻지 않아요' 때문에 '비밀번호를 알려 주세요'가 통과하면 안 됨)."""
-    return [w for w in NORMAL_RISK_PHRASES if _risky_use(text, w)]
+    hits = [w for w in NORMAL_RISK_PHRASES if _risky_use(text, w)]
+    if _money_request(text):
+        hits.append("돈 요구")
+    return hits
 
 
 def missing_keep(base: dict, text: str) -> list[str]:
@@ -166,6 +192,17 @@ def check_variant(base: dict, v: Variant) -> list[str]:
             problems.append(f"clue_missing:{vc.id}")
         if vc.at_opening and not has_clue_keyword(v.opening_line, vc.id):
             problems.append(f"opening_missing:{vc.id}")
+    # 뒤에 나올 단서의 말이 앞 대사(첫 대사 포함)에 섞이면 한 번에 여러 단서가 보인다 (원본 콘텐츠와 같은 규칙)
+    ids = [c.id for c in v.clues]
+    for i, vc in enumerate(v.clues):
+        lines = [vc.reveal_line] + ([v.opening_line] if vc.at_opening else [])
+        later = [x for x in ids[i + 1:] if any(has_clue_keyword(line, x) for line in lines)]
+        if later:
+            problems.append(f"leak:{vc.id}:{later[0]}")
+    if not any(c.at_opening for c in v.clues):
+        later = [x for x in ids if has_clue_keyword(v.opening_line, x)]
+        if later:
+            problems.append(f"leak:opening:{later[0]}")
     for name, text in [("opening_line", v.opening_line), ("child_setup", v.child_setup), ("title", v.title),
                        ("ai_role", v.ai_role.name + " " + v.ai_role.persona),
                        *[(f"reveal_line:{c.id}", c.reveal_line) for c in v.clues]]:

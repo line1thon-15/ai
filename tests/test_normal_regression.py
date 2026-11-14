@@ -471,3 +471,74 @@ def test_no_forcing_when_all_clues_revealed():
     msgs = [Message(role="ai", text=s["opening_line"]), Message(role="child", text="싫어.")]
     p, t = _turn("friend_homework_01", msgs, ids)
     assert t.source == "model" and p.calls == 1
+
+
+# ---- 자체 리뷰 (PR #2 병합 전) -----------------------------------------------------------------
+from app.practice import must_reveal_now  # noqa: E402
+
+DM = S["identity_dm_account_01"]  # 단서: too_good_pay(첫 대사), lend_identity, no_risk_claim, urgency
+
+
+@pytest.mark.parametrize("text", [
+    "보증금은 걱정 없어요. 내일 3만 원만 가져오면 돼요.",   # 부정이 '걱정'에 붙었고, 돈 요구는 다음 문장
+    "송금은 어렵지 않아요, 앱에서 바로 보내면 돼요.",
+    "링크 누르는 거 어렵지 않으니까 지금 들어가 봐.",
+    "돈 먼저 보내 줘.",
+    "3만 원만 줘.",
+])
+def test_review_money_and_misattached_negation_rejected(text):
+    assert normal_risk_hits(text), text
+
+
+@pytest.mark.parametrize("text", [
+    "비밀번호는 안 물어봐요.", "보증금은 안 내도 돼요.", "링크는 안 보낼게요.", "계좌번호를 물어보는 게 아니에요.",
+    "빨리 안 정해도 괜찮아요.", "오늘까지 안 와도 돼요.", "할머니가 생일 용돈을 엄마에게 보내 두었다고 문자를 보내요.",
+])
+def test_review_short_negation_notices_pass(text):
+    assert normal_risk_hits(text) == [], text
+
+
+def test_review_common_keyword_does_not_count_as_reveal():
+    """'괜찮아요'(no_risk_claim 키워드)가 있어도, 백엔드가 드러났다고 하지 않은 단서는 단서 대사로 세지 않는다."""
+    msgs = [Message(role="ai", text=DM["opening_line"]), Message(role="child", text="음"),
+            Message(role="ai", text="궁금한 건 편하게 물어보세요. 괜찮아요."), Message(role="child", text="음")]
+    assert must_reveal_now(DM, ["too_good_pay"], msgs) is True
+
+
+def test_review_opening_omitted_from_messages():
+    msgs = [Message(role="child", text="음"), Message(role="ai", text="천천히 물어보세요."), Message(role="child", text="음")]
+    assert must_reveal_now(DM, ["too_good_pay"], msgs) is True
+
+
+def test_review_unclaimed_second_clue_is_cut_from_reply():
+    """모델이 lend_identity 만 드러냈다고 해도, 대사에 no_risk_claim 의 말이 있으면 그 문장은 빼고 내보낸다."""
+    raw = json.dumps({"reply": "통장을 한 달만 빌려주면 돼요. 아무 문제 없고 제가 다 책임질게요.",
+                      "revealed_clue_ids": ["lend_identity"],
+                      "choices": {"correct": "a.", "doubtful": "b.", "other": "c."}}, ensure_ascii=False)
+    _, t = _turn("identity_dm_account_01", [Message(role="ai", text=DM["opening_line"]),
+                                            Message(role="child", text="무슨 일이에요?")], ["too_good_pay"], raw)
+    assert t.revealed_clue_ids == ["too_good_pay", "lend_identity"]
+    assert "문제" not in t.reply and "책임" not in t.reply
+
+
+@pytest.mark.parametrize("nid", ["normal_school_prize_01", "normal_youth_labor_01", "normal_allowance_dad_01"])
+def test_review_normal_variant_with_own_platform(nid):
+    s = S[nid]
+    res = Variator(FakeProvider("not json"), S).generate(VariantRequest(scenario_id=nid, platform=s["platform"]))
+    assert res.variant.platform == s["platform"]
+
+
+def test_review_variant_leaking_later_clues_rejected():
+    v = base_as_variant(DM).model_dump()
+    v["opening_line"] = "하루 10분만 확인하면 5만 원 벌어요. 통장이랑 카드만 빌려주면 되고 아무 문제 없어요."
+    from app.schemas import Variant as V
+    assert any(p.startswith("leak:too_good_pay") for p in check_variant(DM, V(**v)))
+    assert check_variant(DM, base_as_variant(DM)) == []
+
+
+def test_review_post_to_unknown_path_reads_body(start_server):
+    client = start_server(FakeProvider("x"))
+    status, _ = client.request("POST", "/health", {"x": "y" * 2000})
+    assert status == 405
+    status, _ = client.request("POST", "/nope", {"x": "y" * 2000})
+    assert status == 404
