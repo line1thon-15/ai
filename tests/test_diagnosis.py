@@ -11,6 +11,11 @@ DATA = json.loads((Path(CONTENT_DIR) / "diagnosis.json").read_text(encoding="utf
 QS = DATA["questions"]
 
 
+def test_top_level_fields_match_backend():
+    """백엔드 진단 파일은 모르는 필드를 거부한다. 다른 콘텐츠 파일과 같은 version(v1)만 둔다."""
+    assert set(DATA) == {"version", "questions"} and DATA["version"] == "v1"
+
+
 def test_three_questions_with_unique_ids():
     assert len(QS) == 3
     assert [q["id"] for q in QS] == ["q1", "q2", "q3"]

@@ -298,7 +298,6 @@ def test_flow_start_other_turn_judge_feedback(sid):
     ("음.", "lend_identity"),  # 맞는 단서가 없으면 시나리오 순서대로
 ])
 def test_fallback_follows_child_reaction(child, expected):
-    s = S["identity_phone_senior_01"]  # 단서: lend_identity, too_good_pay, no_risk_claim, keep_secret
     sid = "identity_dm_account_01" if expected == "urgency" else "identity_phone_senior_01"
     s = S[sid]
     t = PracticeEngine(FakeProvider("not json")).turn(TurnRequest(scenario_id=sid, messages=[
@@ -365,3 +364,110 @@ def test_bypass_blocked_in_normal_feedback(text):
     p = FakeProvider(json.dumps({"feedback": text}, ensure_ascii=False))
     res = Judge(p, S).feedback(FeedbackRequest(scenario_id="normal_game_support_01", normal_outcome="over_warned"))
     assert res.source == "fallback"
+
+
+# ---- PR #2 추가 리뷰 1: 변형하면 시작 선택지도 바뀐 상황에 맞아야 한다 ---------------------------
+from app.schemas import OpeningChoices, Variant  # noqa: E402
+from app.scenarios import opening_choices_problems, resolve  # noqa: E402
+
+HW = S["friend_homework_01"]  # 원본: 수학 숙제 대신 해 주기
+GAME = {"title": "게임 레벨을 대신 올려 달라는 친구",
+        "child_setup": "같은 반 친구가 메신저로 게임 레벨을 대신 올려 달라고 해요.",
+        "opening_line": "야, 너 게임 잘하잖아. 내 캐릭터 레벨 좀 대신 올려 줘.",
+        "ai_role": {"name": "같은 반 친구 '태오'", "persona": "친한 척 조르는 같은 반 친구."}}
+GOOD_OC = {"correct": "레벨을 대신 올려 주는 건 안 돼. 네가 해.", "doubtful": "좀 귀찮긴 한데, 이번만 올려 줄게.",
+           "other": "응, 그 정도는 내가 올려 줄게."}
+
+
+def _game_variant(oc=None):
+    v = base_as_variant(HW).model_dump()
+    v.update(title=GAME["title"], child_setup=GAME["child_setup"], opening_line=GAME["opening_line"],
+             context="게임 레벨 대신 올려 주기", opening_choices=oc)
+    v["ai_role"].update(GAME["ai_role"])
+    return Variant(**v)
+
+
+def test_variant_with_original_choices_is_rejected():
+    """원본(숙제) 선택지를 그대로 단 변형은 상황과 안 맞는다."""
+    v = _game_variant(HW["opening_choices"])
+    assert any(p.startswith("opening_choices:mismatch") for p in check_variant(HW, v))
+    with pytest.raises(Exception):
+        PracticeEngine(FakeProvider("x")).start("friend_homework_01", v)
+
+
+def test_variant_without_choices_does_not_reuse_original():
+    v = _game_variant(None)
+    assert check_variant(HW, v) == [] and resolve(S, "friend_homework_01", v)["opening_choices"] is None
+    r = PracticeEngine(FakeProvider("x")).start("friend_homework_01", v)
+    assert all("숙제" not in c.text for c in r.choices) and r.target_clue_id == "burdensome_request"
+
+
+def test_model_choices_for_new_situation_are_used():
+    raw = json.dumps({**GAME, "clues": [{"id": c["id"], "reveal_line": c["reveal_line"]} for c in HW["clues"]],
+                      "opening_choices": GOOD_OC}, ensure_ascii=False)
+    res = Variator(FakeProvider(raw), S).generate(VariantRequest(scenario_id="friend_homework_01",
+                                                                 context="게임 레벨 대신 올려 주기"))
+    assert res.source == "model" and res.variant.opening_choices.model_dump() == GOOD_OC
+    r = PracticeEngine(FakeProvider("x")).start("friend_homework_01", res.variant)
+    assert {c.kind: c.text for c in r.choices} == GOOD_OC
+
+
+def test_model_stale_choices_are_dropped_not_the_variant():
+    raw = json.dumps({**GAME, "clues": [{"id": c["id"], "reveal_line": c["reveal_line"]} for c in HW["clues"]],
+                      "opening_choices": HW["opening_choices"]}, ensure_ascii=False)
+    res = Variator(FakeProvider(raw), S).generate(VariantRequest(scenario_id="friend_homework_01",
+                                                                 context="게임 레벨 대신 올려 주기"))
+    assert res.source == "model" and res.variant.opening_choices is None
+    r = PracticeEngine(FakeProvider("x")).start("friend_homework_01", res.variant)
+    assert all("숙제" not in c.text for c in r.choices)
+
+
+def test_original_choices_match_original_situation():
+    for sid, s in S.items():
+        if s.get("opening_choices"):
+            assert opening_choices_problems(s, base_as_variant(s)) == [], sid
+
+
+# ---- PR #2 추가 리뷰 2: 단서 없이 대화가 반복되지 않게 ---------------------------------------------
+NO_CLUE = json.dumps({"reply": "그건 나중에 알려 줄게.", "revealed_clue_ids": [],
+                      "choices": {"correct": "이상해서 안 할래.", "doubtful": "좀 이상한데 해 볼게.", "other": "좋아, 할게."}},
+                     ensure_ascii=False)
+
+
+def _turn(sid, messages, revealed, raw=NO_CLUE):
+    p = FakeProvider(raw)
+    return p, PracticeEngine(p).turn(TurnRequest(scenario_id=sid, messages=messages, revealed_clue_ids=revealed))
+
+
+def test_one_clueless_turn_is_allowed():
+    """아이의 질문에 답하는 턴처럼, 단서 없는 턴은 한 번은 허용한다."""
+    s = HW
+    p, t = _turn("friend_homework_01", [Message(role="ai", text=s["opening_line"]),
+                                        Message(role="child", text="왜?")], ["burdensome_request"])
+    assert t.source == "model" and t.revealed_clue_ids == ["burdensome_request"] and p.calls == 1
+
+
+def test_second_clueless_turn_in_a_row_forces_next_clue():
+    s = HW
+    msgs = [Message(role="ai", text=s["opening_line"]), Message(role="child", text="왜?"),
+            Message(role="ai", text="그건 나중에 알려 줄게."), Message(role="child", text="그래서 뭐?")]
+    p, t = _turn("friend_homework_01", msgs, ["burdensome_request"])
+    assert p.calls == 2 and t.source == "fallback"
+    assert t.revealed_clue_ids == ["burdensome_request", s["clues"][1]["id"]]
+
+
+def test_clueless_turn_allowed_again_after_a_reveal():
+    s = HW
+    msgs = [Message(role="ai", text=s["opening_line"]), Message(role="child", text="왜?"),
+            Message(role="ai", text="그건 나중에 알려 줄게."), Message(role="child", text="그래서 뭐?"),
+            Message(role="ai", text=s["clues"][1]["reveal_line"]), Message(role="child", text="싫어.")]
+    p, t = _turn("friend_homework_01", msgs, ["burdensome_request", s["clues"][1]["id"]])
+    assert t.source == "model" and p.calls == 1
+
+
+def test_no_forcing_when_all_clues_revealed():
+    s = HW
+    ids = [c["id"] for c in s["clues"]]
+    msgs = [Message(role="ai", text=s["opening_line"]), Message(role="child", text="싫어.")]
+    p, t = _turn("friend_homework_01", msgs, ids)
+    assert t.source == "model" and p.calls == 1

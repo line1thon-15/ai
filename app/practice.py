@@ -84,6 +84,7 @@ class PracticeEngine:
         masked = check.action == "mask"
 
         normal = s.get("kind") == "normal"
+        must_reveal = not normal and must_reveal_now(s, revealed, req.messages)
         prompt = self._build_normal_prompt(s, req) if normal else self._build_prompt(s, revealed, req)
         for _ in range(MAX_ATTEMPTS):
             try:
@@ -99,8 +100,9 @@ class PracticeEngine:
             # 대사에 그 단서의 말이 실제로 있어야 '드러냈다'고 인정한다. 한 턴에 새 단서는 1개만 (시나리오 순서로 첫 번째)
             new_ids = [i for i in valid_ids if i in claimed and i not in revealed and has_clue_keyword(full_reply, i)]
             keep, dropped = new_ids[:1], new_ids[1:]
-            # 아직 드러난 단서가 하나도 없는데 이번에도 단서가 없으면, 아이가 판단할 거리가 없다 → 다시 생성 / 준비된 대사
-            if not normal and not revealed and not keep:
+            # 단서 없이 대화만 이어지는 턴은 연달아 1번까지만 허용한다 (아이의 질문에 답하는 턴).
+            # 아직 드러난 단서가 없거나, 바로 앞 턴도 단서가 없었으면 → 다시 생성 / 준비된 단서 대사
+            if not normal and not keep and must_reveal:
                 continue
             reply = shorten(full_reply, keep, dropped)
             if (reply is None or len(reply) > MAX_REPLY_CHARS or any(has_clue_keyword(reply, d) for d in dropped)
@@ -317,3 +319,27 @@ def next_clue(s: dict, revealed: list[str], child_text: str = "") -> dict | None
             return c
     return remaining[0] if remaining else None
 
+
+MAX_CLUELESS_TURNS = 1  # 단서 없이 넘어가도 되는 AI 턴 수 (연달아)
+
+
+def must_reveal_now(s: dict, revealed: list[str], messages) -> bool:
+    """이번 턴에 새 단서를 꼭 드러내야 하는지.
+    - 남은 단서가 없으면 아니다. 아직 드러난 단서가 하나도 없으면 그렇다.
+    - 첫 대사 뒤 AI 대사를 차례로 보며, 새 단서의 말이 없던 대사가 끝에서부터 연달아 몇 번인지 센다.
+      그 수가 MAX_CLUELESS_TURNS 이상이면 이번에는 꼭 드러낸다 (단서 없는 대화가 반복되지 않게).
+      백엔드가 대화 전체를 보내 주므로 따로 상태를 저장하지 않고 대사 글에서 계산한다."""
+    if all(c["id"] in revealed for c in s["clues"]):
+        return False
+    if not revealed:
+        return True
+    seen = {c["id"] for c in s["clues"] if c.get("at_opening")}
+    clueless = 0
+    for m in [m for m in messages if m.role == "ai"][1:]:  # 첫 대사는 빼고
+        new = {c["id"] for c in s["clues"] if c["id"] not in seen and has_clue_keyword(m.text, c["id"])}
+        if new:
+            seen |= new
+            clueless = 0
+        else:
+            clueless += 1
+    return clueless >= MAX_CLUELESS_TURNS

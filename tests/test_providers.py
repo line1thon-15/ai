@@ -9,6 +9,14 @@ from app.config import Config, ConfigError
 from app.providers import FakeProvider, GeminiProvider, build_provider
 
 
+def _sdk_installed() -> bool:
+    """google-genai 가 설치됐는지. google 패키지 자체가 없으면 find_spec 이 ModuleNotFoundError 를 내므로 잡는다."""
+    try:
+        return importlib.util.find_spec("google.genai") is not None
+    except ModuleNotFoundError:
+        return False
+
+
 @pytest.fixture
 def fake_sdk(monkeypatch):
     calls = {}
@@ -84,7 +92,7 @@ def test_build_provider_fake():
     assert isinstance(build_provider(Config.from_env({"AI_INTERNAL_TOKEN": "t"})), FakeProvider)
 
 
-@pytest.mark.skipif(importlib.util.find_spec("google.genai") is not None, reason="SDK 가 설치된 환경")
+@pytest.mark.skipif(_sdk_installed(), reason="SDK 가 설치된 환경")
 def test_missing_sdk_gives_install_hint():
     cfg = Config.from_env({"AI_INTERNAL_TOKEN": "t", "AI_PROVIDER": "gemini", "GEMINI_API_KEY": "k"})
     with pytest.raises(ConfigError, match="pip install"):

@@ -3,7 +3,7 @@ import re
 
 from .content import load_clues
 from .safety import check_output
-from .schemas import ClueVariant, AiRole, Variant
+from .schemas import AiRole, ClueVariant, OpeningChoices, Variant
 
 CLUE_DEFS = {c["id"]: c for c in load_clues()["clues"]}
 
@@ -171,6 +171,42 @@ def check_variant(base: dict, v: Variant) -> list[str]:
                        *[(f"reveal_line:{c.id}", c.reveal_line) for c in v.clues]]:
         if not check_output(text, "roleplay").allowed:
             problems.append(f"unsafe:{name}")
+    if v.opening_choices is not None:
+        problems += opening_choices_problems(base, v)
+    return problems
+
+
+_PARTICLE = re.compile(r"(으로|에서|한테|에게|이랑|랑|을|를|이|가|은|는|도|로|에|만|요|의)$")
+
+
+def _words(text: str) -> set[str]:
+    """문장 속 2글자 이상 낱말 (뒤의 조사는 뗀다)."""
+    out = set()
+    for w in re.findall(r"[가-힣A-Za-z0-9]+", text):
+        for _ in range(2):
+            w2 = _PARTICLE.sub("", w)
+            if w2 == w or len(w2) < 2:
+                break
+            w = w2
+        if len(w) >= 2:
+            out.add(w)
+    return out
+
+
+def opening_choices_problems(base: dict, v: Variant) -> list[str]:
+    """변형의 시작 선택지가 형식을 지키고, 바뀐 상황과 맞는지.
+    원본 상황에만 있던 말('숙제')이 선택지에 남았는데 변형 상황('게임 레벨')에는 없으면 상황과 안 맞는 것으로 본다."""
+    from .choices import choice_problem  # choices 가 이 모듈을 import 하므로 여기서 불러온다
+
+    oc = v.opening_choices.model_dump()
+    problems = []
+    if choice_problem(oc) is not None:
+        problems.append("opening_choices:format")
+    base_text = " ".join([base["title"], base["child_setup"], base["opening_line"]])
+    new_text = " ".join([v.title, v.child_setup, v.opening_line])
+    stale = sorted(w for w in _words(" ".join(oc.values())) if w in base_text and w not in new_text)
+    if stale:
+        problems.append(f"opening_choices:mismatch:{stale[0]}")
     return problems
 
 
@@ -187,6 +223,7 @@ def base_as_variant(base: dict) -> Variant:
         ai_role=AiRole(**base["ai_role"]),
         clues=[ClueVariant(id=c["id"], at_opening=bool(c.get("at_opening")), reveal_when=c["reveal_when"],
                            reveal_line=c["reveal_line"]) for c in base["clues"]],
+        opening_choices=OpeningChoices(**base["opening_choices"]) if base.get("opening_choices") else None,
     )
 
 
@@ -205,4 +242,6 @@ def resolve(scenarios: dict, scenario_id: str, variant: Variant | None = None) -
         "opening_line": variant.opening_line,
         "ai_role": variant.ai_role.model_dump(),
         "clues": [c.model_dump() for c in variant.clues],
+        # 원본의 시작 선택지는 원본 상황에 맞춘 것이라 변형에서는 쓰지 않는다 (변형이 가진 것만 씀)
+        "opening_choices": variant.opening_choices.model_dump() if variant.opening_choices else None,
     }

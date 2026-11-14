@@ -29,6 +29,8 @@ def model_json(variant: dict, **override) -> str:
         "opening_line": variant["opening_line"],
         "clues": [{"id": c["id"], "reveal_line": c["reveal_line"]} for c in variant["clues"]],
     }
+    if variant.get("opening_choices"):
+        data["opening_choices"] = variant["opening_choices"]
     data.update(override)
     return json.dumps(data, ensure_ascii=False)
 

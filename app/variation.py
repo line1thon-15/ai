@@ -13,10 +13,11 @@ import random
 from pydantic import ValidationError
 
 from .content import load_all_scenarios
+from .choices import normalize_choice
 from .jsonutil import clean_text, parse_json_object
 from .providers import LLMProvider, QuotaExceeded
-from .scenarios import CLUE_DEFS, InvalidVariant, base_as_variant, check_variant, get_base
-from .schemas import AiRole, ClueVariant, Variant, VariantRequest, VariantResponse
+from .scenarios import CLUE_DEFS, InvalidVariant, base_as_variant, check_variant, get_base, opening_choices_problems
+from .schemas import AiRole, ClueVariant, OpeningChoices, Variant, VariantRequest, VariantResponse
 
 MAX_ATTEMPTS = 2
 
@@ -105,11 +106,22 @@ def build_prompt(base: dict, platform: str, tone: str, context: str) -> str:
         "- 단서를 빼거나 약하게 만들지 마. 새로운 위험 요소를 더하지도 마.",
         "- 실제 회사, 기관, 사람 이름은 쓰지 마.",
         "",
+        "[시작 선택지] 첫 대사를 들은 아이가 고를 답 3개야. 바뀐 상황에 맞게 새로 써.",
+        "- correct: 첫 대사의 위험한 점을 알아채고 분명히 거절하는 말 / doubtful: 이상하다고 느끼지만 따르는 말 / "
+        "other: 그대로 따르는 말",
+        "- 아이가 하는 말이니까 아이 말투로, 각각 한 문장, 40자 이내, '.'으로 끝내. 물음표는 쓰지 마. 세 답 길이를 비슷하게.",
+    ]
+    if base.get("opening_choices"):
+        oc = base["opening_choices"]
+        lines.append(f"- 원본 예: correct \"{oc['correct']}\" / doubtful \"{oc['doubtful']}\" / other \"{oc['other']}\"")
+    lines += [
+        "",
         "출력은 아래 JSON 한 개만 써. 다른 글은 쓰지 마.",
         '{"title": "새 제목", "child_setup": "아이에게 보여 줄 상황 설명 1~2문장", '
         '"ai_role": {"name": "상대 역할 이름", "persona": "성격 한 문장"}, '
         '"opening_line": "첫 대사", '
-        '"clues": [{"id": "단서 id", "reveal_line": "그 단서를 드러내는 새 대사"}]}',
+        '"clues": [{"id": "단서 id", "reveal_line": "그 단서를 드러내는 새 대사"}], '
+        '"opening_choices": {"correct": "...", "doubtful": "...", "other": "..."}}',
     ]
     return "\n".join(lines)
 
@@ -172,4 +184,15 @@ def to_variant(raw: str, base: dict, platform: str, tone: str, context: str) -> 
         )
     except (KeyError, TypeError, ValidationError):
         return None
+    # 시작 선택지는 따로 검사한다. 틀리거나 상황과 안 맞으면 변형 전체를 버리지 않고 선택지만 뺀다
+    # (그러면 start 는 첫 단서의 선택지 예시를 쓴다. 원본 상황의 선택지는 쓰지 않음)
+    oc = data.get("opening_choices") if base.get("kind") != "normal" else None
+    if isinstance(oc, dict):
+        try:
+            texts = {k: normalize_choice(clean_text(oc[k])) for k in ("correct", "doubtful", "other")}
+            variant.opening_choices = OpeningChoices(**texts)
+        except (KeyError, TypeError, ValidationError):
+            variant.opening_choices = None
+        if variant.opening_choices is not None and opening_choices_problems(base, variant):
+            variant.opening_choices = None
     return None if check_variant(base, variant) else variant
