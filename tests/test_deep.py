@@ -163,3 +163,11 @@ def test_templates_pass_new_checks(sid):
     out = _template(s, clues, "몰라요")
     assert all(_problem(x, _allowed_text(clues)) is None for x in out), out
     assert sum(len(x) for x in out) <= MAX_TOTAL_CHARS
+
+
+def test_very_short_sentence_is_joined_to_previous():
+    """실제 Gemini 출력: '아주 칭찬해요.'가 따로 한 항목으로 와서 어색했다 → 앞 문장에 붙인다."""
+    out = _parse(_raw(["일하기 전에 돈을 먼저 내라고 한 점을 잘 발견했어요.", "아주 칭찬해요.",
+                       "쉬운 일인데 돈을 너무 많이 주는 것도 위험 신호예요."]))
+    assert out == ["일하기 전에 돈을 먼저 내라고 한 점을 잘 발견했어요. 아주 칭찬해요.",
+                   "쉬운 일인데 돈을 너무 많이 주는 것도 위험 신호예요."]

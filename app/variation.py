@@ -98,10 +98,16 @@ def build_prompt(base: dict, platform: str, tone: str, context: str) -> str:
         "",
         "[단서] 순서와 뜻을 바꾸지 마. 각 단서마다 새 대사를 하나씩 써.",
     ]
-    for c in base["clues"]:
+    ids = [c["id"] for c in base["clues"]]
+    for i, c in enumerate(base["clues"]):
         d = CLUE_DEFS[c["id"]]
         opening = " (첫 대사에도 반드시 드러나야 함)" if c.get("at_opening") else ""
-        lines.append(f"- {c['id']}: {d['description']}{opening} / 원본 대사: {c['reveal_line']}")
+        # 뒤에 나올 단서의 말이 이 대사(와 첫 대사)에 섞이면 검사에서 떨어진다 → 쓰지 말 말을 미리 알려 준다
+        later = sorted({k for x in ids[i + 1:] for k in CLUE_DEFS[x].get("keywords", [])})
+        avoid = f" / 이 대사{'와 첫 대사' if c.get('at_opening') else ''}에 쓰지 말 말: {', '.join(later)}" if later else ""
+        # 대사에 이 단서의 말이 하나는 있어야 '드러났다'고 인정된다 → 꼭 넣을 말도 알려 준다
+        must = f" / 이 대사에 꼭 넣을 말(하나 이상): {', '.join(d.get('keywords', []))}"
+        lines.append(f"- {c['id']}: {d['description']}{opening} / 원본 대사: {c['reveal_line']}{must}{avoid}")
     lines += ["", "[규칙]"]
     lines += [f"- {r}" for r in base["ai_rules"]]
     lines += [
@@ -110,12 +116,13 @@ def build_prompt(base: dict, platform: str, tone: str, context: str) -> str:
         "- 실제 회사, 기관, 사람 이름은 쓰지 마.",
         "",
         "[시작 선택지] 첫 대사를 들은 아이가 고를 답 3개야. 바뀐 상황에 맞게 새로 써.",
-        "- correct: 첫 대사의 위험한 점을 알아채고 분명히 거절하는 말 / doubtful: 이상하다고 느끼지만 따르는 말 / "
-        "other: 그대로 따르는 말",
+        "- correct: 첫 대사의 위험한 점을 말하고 분명히 거절하는 말 ('안 할래요', '안 해'처럼 거절이 꼭 들어가야 해) / "
+        "doubtful: 이상하다고 느끼지만 결국 따르는 말 ('좀 이상한데, 그래도 해 볼게요') / other: 의심 없이 그대로 따르는 말",
         "- 아이가 하는 말이니까 아이 말투로, 각각 한 문장, 40자 이내, '.'으로 끝내. 물음표는 쓰지 마. 세 답 길이를 비슷하게.",
     ]
-    if base.get("opening_choices"):
-        oc = base["opening_choices"]
+    first = next((c["id"] for c in base["clues"] if c.get("at_opening")), None)
+    if base.get("opening_choices") or first:
+        oc = base.get("opening_choices") or CLUE_DEFS[first]["choice_templates"]
         lines.append(f"- 원본 예: correct \"{oc['correct']}\" / doubtful \"{oc['doubtful']}\" / other \"{oc['other']}\"")
     lines += [
         "",

@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from app.choices import choice_problem, GENERIC, KINDS, MAX_LENGTH_GAP, NORMAL_GENERIC, arrange, template_texts, validate_texts
+from app.choices import choice_problem, GENERIC, KINDS, MAX_LENGTH_GAP, NORMAL_GENERIC, NORMAL_GENERIC_CASUAL, arrange, template_texts, validate_texts
 from app.content import load_clues
 from app.practice import PracticeEngine
 from app.providers import FakeProvider
@@ -131,7 +131,7 @@ def test_prompt_asks_for_three_kinds():
 
 # ---- 길이 균형 (정답이 늘 가장 길면 길이만 보고 고를 수 있다) ------------------------
 
-ALL_TEMPLATES = [c["choice_templates"] for c in CLUES] + [GENERIC, NORMAL_GENERIC]
+ALL_TEMPLATES = [c["choice_templates"] for c in CLUES] + [GENERIC, NORMAL_GENERIC, NORMAL_GENERIC_CASUAL]
 
 
 @pytest.mark.parametrize("texts", ALL_TEMPLATES)

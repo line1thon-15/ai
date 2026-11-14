@@ -12,7 +12,7 @@
 """
 import re
 
-from .choices import NORMAL_GENERIC, arrange, template_texts, validate_texts
+from .choices import arrange, normal_generic, template_texts, validate_texts
 from .content import load_all_scenarios, load_clues
 from .hints import hint_text
 from .jsonutil import clean_text, parse_json_object, split_sentences
@@ -238,7 +238,7 @@ class PracticeEngine:
 
 
 def _templates(s: dict, target: str | None) -> dict:
-    return dict(NORMAL_GENERIC) if s.get("kind") == "normal" else template_texts(target)
+    return normal_generic(s) if s.get("kind") == "normal" else template_texts(target)
 
 
 def _response(s, status, reply, revealed, target, model_choices, *, masked, source) -> TurnResponse:

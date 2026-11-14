@@ -126,6 +126,8 @@ curl http://127.0.0.1:8081/health
 | 401 | `unauthorized` | 토큰이 없거나 틀림 |
 | 404 | `scenario_not_found` | 없는 시나리오 id |
 | 413 | `payload_too_large` | 본문이 64KB 초과 |
+| 408 | `request_timeout` | 본문이 10초 넘게 다 오지 않음 (연결을 끊음) |
+| 400 | `incomplete_body` | `Content-Length`보다 본문이 짧은 채로 연결이 끝남 |
 | 422 | `invalid_request` | 입력 형식 오류. `fields`에 틀린 필드 **이름만** 담음 (입력 값은 담지 않음) |
 | 422 | `invalid_variant` | 보낸 변형이 원래 시나리오의 틀(위험 신호 순서 등)과 맞지 않음 |
 | 500 | `internal_error` | 서버 오류. 로그에는 오류 종류만 남김 |

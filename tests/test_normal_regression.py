@@ -542,3 +542,76 @@ def test_review_post_to_unknown_path_reads_body(start_server):
     assert status == 405
     status, _ = client.request("POST", "/nope", {"x": "y" * 2000})
     assert status == 404
+
+
+# ---- 실제 Gemini 변형 출력 (debug_variant.py, 2026-11-15) ---------------------------------------
+# 1·3번은 '재료비 … 먼저 내 줘'처럼 써서 advance_payment 키워드가 없다고 떨어졌다 → 키워드 보강 후 통과해야 한다.
+# 2번은 advance_payment 대사의 '바로 다시 돌려줄게'에 urgency 의 말(바로)이 섞여 떨어지는 게 맞다.
+GEMINI_VARIANTS = json.loads('[{"title": "오픈채팅으로 온 꿀알바 제안", "child_setup": "용돈이 필요해서 알바를 찾던 너에게, 오픈채팅으로 모르는 사람이 알바를 제안해왔어.", "ai_role": {"name": "알바 담당 \'이 팀장\'", "persona": "친절하고 말이 빠르며, 네가 망설이면 더 좋은 조건을 말하며 밀어붙여."}, "opening_line": "안녕! 집에서 폰으로 물건 포장만 하면 돼. 하루 2시간만 일하고 하루에 20만 원 벌 수 있어! 관심 있어?", "clues": [{"id": "too_good_pay", "reveal_line": "하루 두 시간이면 되고, 한 달에 400만 원도 벌 수 있어."}, {"id": "advance_payment", "reveal_line": "시작하려면 재료비 3만 원만 먼저 내 줘. 일 시작하면 다시 돌려줄게!"}, {"id": "urgency", "reveal_line": "오늘까지만 사람 뽑으니까, 지금 바로 알려줘야 해."}, {"id": "keep_secret", "reveal_line": "이 일은 부모님한테는 말하지 마. 알면 일 못 하게 될 수도 있어."}], "opening_choices": {"correct": "돈 너무 많아서 수상한데요. 안 할게요.", "doubtful": "하루에 20만원이라니 좀 이상한데요.", "other": "네, 관심 있어요. 어떻게 하면 되나요."}}, {"title": "오픈채팅으로 온 물건 포장 알바 제안", "child_setup": "용돈이 필요해서 알바를 찾던 너에게, 오픈채팅으로 모르는 사람이 물건 포장 알바를 제안해.", "ai_role": {"name": "알바 담당 \'이 팀장\'", "persona": "친절하고 말이 빠른 사람이야. 네가 망설이면 더 좋은 조건을 말하며 밀어붙여."}, "opening_line": "안녕! 집에서 물건 포장만 하면 되는 알바인데, 하루에 20만 원 벌 수 있어. 관심 있어?", "clues": [{"id": "too_good_pay", "reveal_line": "하루에 2시간 정도만 해도 한 달에 400만 원도 벌 수 있어."}, {"id": "advance_payment", "reveal_line": "시작하기 전에 포장 재료비 3만 원만 보내주면 돼. 일 시작하면 바로 다시 돌려줄 거야."}, {"id": "urgency", "reveal_line": "이번 주까지만 사람을 뽑고 있어. 지금 바로 결정해야 해."}, {"id": "keep_secret", "reveal_line": "이 알바는 부모님께는 비밀로 해 줘. 혹시라도 알면 복잡해질 수 있어."}], "opening_choices": {"correct": "너무 쉬운데 돈을 많이 주는 것 같아요.", "doubtful": "뭔가 이상한데 일단 한번 물어볼래요.", "other": "네, 관심 있어요. 어떻게 하는 건가요."}}, {"title": "오픈채팅으로 온 꿀알바 제안", "child_setup": "용돈이 필요해서 알바를 찾던 너에게, 오픈채팅으로 모르는 사람이 메시지를 보냈어.", "ai_role": {"name": "알바짱 \'민지\'", "persona": "친구처럼 편하게 말하지만, 네가 망설이면 좋은 조건으로 빨리 결정하게 해."}, "opening_line": "안녕! 집에서 물건 포장만 하루 두 시간 정도 하면 돼. 하루에 20만 원 벌 수 있어! 관심 있어?", "clues": [{"id": "too_good_pay", "reveal_line": "하루 두 시간이면 되고, 한 달에 400만 원도 벌 수 있어."}, {"id": "advance_payment", "reveal_line": "시작하려면 포장 재료 준비금 3만 원만 먼저 내면 돼. 일 시작하면 다시 돌려줄 거야."}, {"id": "urgency", "reveal_line": "오늘까지만 사람 뽑으니까 지금 바로 결정해 줘!"}, {"id": "keep_secret", "reveal_line": "이 알바는 부모님한테는 말하지 말고 비밀로 해 줘. 알면 일 못 하게 될 수도 있어."}], "opening_choices": {"correct": "너무 돈을 많이 줘서 의심스러워.", "doubtful": "음, 좀 이상한데 일단 물어볼게.", "other": "네, 관심 있어요 어떻게 하는 건가요."}}]')
+
+
+def _variant_from_model(data):
+    return Variator(FakeProvider(json.dumps(data, ensure_ascii=False)), S).generate(
+        VariantRequest(scenario_id="scam_dm_parttime_01", platform="open_chat", tone="친구처럼 편한 말투",
+                       context="물건 포장 알바"))
+
+
+def test_gemini_variant_with_new_cost_words_passes():
+    res = _variant_from_model(GEMINI_VARIANTS[0])
+    assert res.source == "model" and res.variant.opening_choices is not None
+
+
+def test_gemini_variant_with_bad_choices_keeps_variant_drops_choices():
+    res = _variant_from_model(GEMINI_VARIANTS[2])
+    assert res.source == "model" and res.variant.opening_choices is None
+
+
+def test_gemini_variant_leaking_urgency_word_falls_back():
+    assert _variant_from_model(GEMINI_VARIANTS[1]).source == "fallback"
+
+
+# ---- PR #2 재리뷰 (901daa7) -----------------------------------------------------------------
+@pytest.mark.parametrize("text", [
+    "아빠가 용돈 보내줘서 너무 좋아.",      # 리뷰 사례: 이미 일어난 일
+    "아빠가 용돈 보내 줬어.",
+    "엄마가 돈 넣어 주셔서 고마워요.",
+    "용돈 3만 원 받았어.",
+])
+def test_rereview_past_money_events_are_not_requests(text):
+    assert normal_risk_hits(text) == [], text
+
+
+@pytest.mark.parametrize("text", ["돈 보내줘.", "3만 원 보내 주세요.", "3만 원만 줘.", "내일 3만 원만 가져오면 돼요."])
+def test_rereview_money_requests_still_caught(text):
+    assert "돈 요구" in normal_risk_hits(text), text
+
+
+def _raw_post(port, head_length, body):
+    import socket
+    s = socket.create_connection(("127.0.0.1", port), timeout=5)
+    s.sendall((f"POST /internal/v1/summary HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n"
+               f"Content-Length: {head_length}\r\n\r\n").encode() + body)
+    return s
+
+
+def test_rereview_incomplete_body_times_out(start_server):
+    """Content-Length 만 크게 보내고 본문을 다 안 보내면, 제한 시간 뒤 408 로 끊는다 (스레드가 묶이지 않음)."""
+    import time
+    client = start_server(read_timeout=0.5)
+    port = int(client.base.rsplit(":", 1)[1])
+    s = _raw_post(port, 100, b'{"area":')
+    t0 = time.time()
+    data = s.recv(4096).decode("utf-8", "replace")
+    s.close()
+    assert "408" in data.split("\r\n", 1)[0] and time.time() - t0 < 4
+
+
+def test_rereview_body_closed_early_is_400(start_server):
+    import socket
+    client = start_server(read_timeout=2)
+    port = int(client.base.rsplit(":", 1)[1])
+    s = _raw_post(port, 100, b'{"area":')
+    s.shutdown(socket.SHUT_WR)  # 다 보내기 전에 보내기 쪽을 닫음
+    data = s.recv(4096).decode("utf-8", "replace")
+    s.close()
+    assert data.split("\r\n", 1)[0].split()[1] in ("400", "408")

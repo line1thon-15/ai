@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.choices import KINDS, NORMAL_GENERIC, validate_texts
+from app.choices import KINDS, NORMAL_GENERIC, NORMAL_GENERIC_CASUAL, normal_generic, validate_texts
 from app.content import load_all_scenarios
 from app.judge import Judge
 from app.practice import NORMAL_FALLBACK, PracticeEngine, shorten
@@ -46,7 +46,7 @@ def test_normal_start(nid):
     r = PracticeEngine(FakeProvider()).start(nid)
     assert r.reply == SCENARIOS[nid]["opening_line"] and r.revealed_clue_ids == [] and r.target_clue_id is None
     assert sorted(c.kind for c in r.choices) == sorted(KINDS)
-    assert {c.text for c in r.choices} == set(NORMAL_GENERIC.values())
+    assert {c.text for c in r.choices} == set(normal_generic(SCENARIOS[nid]).values())
 
 
 def test_normal_start_contract(start_server):
@@ -251,3 +251,10 @@ def test_normal_variant_with_stranger_wording_falls_back():
     bad = {**NORMAL_VARIANT, "title": "오픈채팅방에 뜬 알바 모집 글"}
     r = Variator(FakeProvider(json.dumps(bad, ensure_ascii=False))).generate(VariantRequest(scenario_id=NID))
     assert r.source == "fallback"
+
+
+def test_friend_normal_uses_casual_choices():
+    """상대가 친구인 정상 상황은 아이 선택지도 반말, 사장님·기관은 존댓말."""
+    assert normal_generic(SCENARIOS["normal_study_together_01"]) == NORMAL_GENERIC_CASUAL
+    assert normal_generic(SCENARIOS["normal_cafe_01"]) == NORMAL_GENERIC
+    assert validate_texts(NORMAL_GENERIC_CASUAL) == NORMAL_GENERIC_CASUAL
