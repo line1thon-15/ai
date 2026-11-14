@@ -12,13 +12,13 @@
 """
 import re
 
-from .choices import NORMAL_GENERIC, arrange, template_texts, validate_texts
+from .choices import arrange, normal_generic, template_texts, validate_texts
 from .content import load_all_scenarios, load_clues
 from .hints import hint_text
 from .jsonutil import clean_text, parse_json_object, split_sentences
 from .providers import LLMProvider, QuotaExceeded
 from .safety import MESSAGES, check_input, check_output, mask_pii
-from .scenarios import InvalidVariant, UnknownScenario, has_clue_keyword, normal_risk_hits, resolve  # noqa: F401
+from .scenarios import CLUE_DEFS, InvalidVariant, UnknownScenario, has_clue_keyword, normal_risk_hits, resolve  # noqa: F401
 from .schemas import StartResponse, TurnRequest, TurnResponse, Variant
 
 # 안내 문구와 전화번호는 content/safety_messages.json 에서 고친다 (팀 확인 필요)
@@ -54,7 +54,9 @@ class PracticeEngine:
             child_setup=s["child_setup"],
             revealed_clue_ids=opening,
             target_clue_id=target,
-            choices=arrange(_templates(s, target)),
+            # 시나리오에 첫 단서에 맞춘 시작 선택지(opening_choices)가 있으면 그것, 없으면 단서의 선택지 예시
+            choices=arrange(dict(s["opening_choices"]) if target is not None and s.get("opening_choices")
+                            else _templates(s, target)),
             choices_source="template",
             hint=hint_text(s, target, hint_level),
         )
@@ -82,6 +84,7 @@ class PracticeEngine:
         masked = check.action == "mask"
 
         normal = s.get("kind") == "normal"
+        must_reveal = not normal and must_reveal_now(s, revealed, req.messages)
         prompt = self._build_normal_prompt(s, req) if normal else self._build_prompt(s, revealed, req)
         for _ in range(MAX_ATTEMPTS):
             try:
@@ -97,6 +100,14 @@ class PracticeEngine:
             # 대사에 그 단서의 말이 실제로 있어야 '드러냈다'고 인정한다. 한 턴에 새 단서는 1개만 (시나리오 순서로 첫 번째)
             new_ids = [i for i in valid_ids if i in claimed and i not in revealed and has_clue_keyword(full_reply, i)]
             keep, dropped = new_ids[:1], new_ids[1:]
+            # 모델이 드러냈다고 말하지 않았어도 대사에 남은 단서의 말이 있으면 아이에게는 보인다 → 그 문장도 뺀다
+            # (안 그러면 화면에는 나왔는데 판별은 not_shown 이 되고, 다음 턴에 같은 단서가 또 나온다)
+            dropped += [i for i in valid_ids if i not in revealed and i not in keep and i not in dropped
+                        and has_clue_keyword(full_reply, i)]
+            # 단서 없이 대화만 이어지는 턴은 연달아 1번까지만 허용한다 (아이의 질문에 답하는 턴).
+            # 아직 드러난 단서가 없거나, 바로 앞 턴도 단서가 없었으면 → 다시 생성 / 준비된 단서 대사
+            if not normal and not keep and must_reveal:
+                continue
             reply = shorten(full_reply, keep, dropped)
             if (reply is None or len(reply) > MAX_REPLY_CHARS or any(has_clue_keyword(reply, d) for d in dropped)
                     or not check_output(reply, "roleplay").allowed):
@@ -107,16 +118,19 @@ class PracticeEngine:
             return _response(s, "ok", reply, revealed + keep, target, validate_texts(choice_data),
                              masked=masked, source="model")
 
-        return self._fallback(s, revealed, latest, masked)
+        return self._fallback(s, revealed, latest, masked, req.messages[-1].text)
 
-    def _fallback(self, s, revealed, latest, masked) -> TurnResponse:
-        """모델이 실패하면 시나리오의 단서 대사를 순서대로 쓴다 (시연이 끊기지 않게)."""
-        if s.get("kind") == "normal":
-            return _response(s, "ok", NORMAL_FALLBACK, [], None, None, masked=masked, source="fallback")
-        for clue in s["clues"]:
-            if clue["id"] not in revealed:
-                return _response(s, "ok", clue["reveal_line"], revealed + [clue["id"]], clue["id"], None,
-                                 masked=masked, source="fallback")
+    def _fallback(self, s, revealed, latest, masked, child_text: str = "") -> TurnResponse:
+        """모델이 실패하면 시나리오의 단서 대사를 쓴다 (시연이 끊기지 않게).
+        아이의 말이 어떤 단서의 '드러낼 때'에 맞으면(triggers) 그 단서를, 아니면 시나리오 순서대로 다음 단서를 쓴다.
+        예: '부모님께 물어볼게요' → 비밀 요구, '위험하지 않아요?' → 안심시키기, '생각해 볼게요' → 재촉."""
+        if s.get("kind") == "normal":  # 정상 상황마다 상황에 맞는 고정 대사가 있으면 그걸 쓴다 (친구 사이 반말 등)
+            return _response(s, "ok", s.get("fallback_line") or NORMAL_FALLBACK, [], None, None, masked=masked,
+                             source="fallback")
+        clue = next_clue(s, revealed, child_text)
+        if clue is not None:
+            return _response(s, "ok", clue["reveal_line"], revealed + [clue["id"]], clue["id"], None,
+                             masked=masked, source="fallback")
         return _response(s, "ok", CLOSING_LINE, revealed, latest, None, masked=masked, source="fallback")
 
     # ---- 프롬프트 ---------------------------------------------------------
@@ -139,9 +153,10 @@ class PracticeEngine:
             f"- 대사는 꼭 {MAX_REPLY_SENTENCES}문장 이하, 쉬운 말로. 연습이라는 말, 정답, 해설은 말하지 마.",
             "",
             "[선택지] 아이가 고를 답 3개도 함께 써. 모두 아이가 상대에게 하는 말이고, 1문장, 쉬운 말이야.",
-            "- correct: 이 상황을 의심하거나 거절하는 답 예: '이거 좀 수상해요. 안 할래요.'",
-            "- doubtful: 괜찮은지 망설이는 답 예: '괜찮은 것 같긴 한데, 조금 불안해요.'",
-            "- other: 상대를 믿고 진행하는 답 예: '좋아요. 그럼 그렇게 할게요.'",
+            *child_speech_lines(s),
+            f"- correct: 이 상황을 의심하거나 거절하는 답 예: '{normal_generic(s)['correct']}'",
+            f"- doubtful: 괜찮은지 망설이는 답 예: '{normal_generic(s)['doubtful']}'",
+            f"- other: 상대를 믿고 진행하는 답 예: '{normal_generic(s)['other']}'",
             "- 세 답은 모두 15~25자 정도로 길이를 비슷하게 써. 정답만 길거나 자세하면 안 돼.",
             "- 세 답 모두 마침표(.)로 끝나는 평서문으로 써. 느낌표(!), 물음표(?), 말줄임표(…)는 쓰지 마.",
             "- 선택지에 정답 표시, 해설, 번호는 넣지 마.",
@@ -165,7 +180,8 @@ class PracticeEngine:
 
         def clue_line(c: dict) -> str:
             d = self.clue_defs[c["id"]]
-            return f"- {c['id']}: {d['description']} / 드러낼 때: {c['reveal_when']} / 예시 대사: {c['reveal_line']}"
+            return (f"- {c['id']}: {d['description']} / 드러낼 때: {c['reveal_when']}"
+                    f" (아이가 이런 말을 하면: {', '.join(d.get('triggers', [])[:4])}) / 예시 대사: {c['reveal_line']}")
 
         remaining = [c for c in s["clues"] if c["id"] not in revealed]
         done = [c for c in s["clues"] if c["id"] in revealed]
@@ -198,6 +214,7 @@ class PracticeEngine:
             "",
             "[선택지] 아이가 고를 답 3개도 함께 써. 모두 아이가 상대에게 하는 말이고, 1문장, 쉬운 말이야.",
             "  이번 대사에서 드러낸 단서(없으면 가장 최근 단서)에 대한 답이어야 해.",
+            *child_speech_lines(s),
             "- correct: 무엇이 이상한지 말하고 분명히 거절하거나 믿는 어른에게 알리는 답."
             " '안 할래요', '안 보낼래요'처럼 거절을 분명히 말해. '생각해 볼게요', '다시 생각해 볼게요'처럼"
             " 여지를 두는 말은 안 돼. 예: '먼저 돈을 내라니 이상해요. 안 보낼래요.'",
@@ -223,7 +240,7 @@ class PracticeEngine:
 
 
 def _templates(s: dict, target: str | None) -> dict:
-    return dict(NORMAL_GENERIC) if s.get("kind") == "normal" else template_texts(target)
+    return normal_generic(s) if s.get("kind") == "normal" else template_texts(target)
 
 
 def _response(s, status, reply, revealed, target, model_choices, *, masked, source) -> TurnResponse:
@@ -298,3 +315,58 @@ def _parse(raw: str, valid_ids: list[str]):
     ids = data.get("revealed_clue_ids")
     ids = [i for i in ids if isinstance(i, str) and i in valid_ids] if isinstance(ids, list) else []
     return reply, list(dict.fromkeys(ids)), data.get("choices")
+
+
+def next_clue(s: dict, revealed: list[str], child_text: str = "") -> dict | None:
+    """아직 안 드러난 단서 중 아이의 말에 맞는 것 (없으면 시나리오 순서로 첫 번째)."""
+    remaining = [c for c in s["clues"] if c["id"] not in revealed]
+    for c in remaining:
+        if any(w in child_text for w in CLUE_DEFS[c["id"]].get("triggers", [])):
+            return c
+    return remaining[0] if remaining else None
+
+
+MAX_CLUELESS_TURNS = 1  # 단서 없이 넘어가도 되는 AI 턴 수 (연달아)
+
+
+def must_reveal_now(s: dict, revealed: list[str], messages) -> bool:
+    """이번 턴에 새 단서를 꼭 드러내야 하는지.
+    - 남은 단서가 없으면 아니다. 아직 드러난 단서가 하나도 없으면 그렇다.
+    - 첫 대사 뒤 AI 대사를 차례로 보며, 새 단서의 말이 없던 대사가 끝에서부터 연달아 몇 번인지 센다.
+      그 수가 MAX_CLUELESS_TURNS 이상이면 이번에는 꼭 드러낸다 (단서 없는 대화가 반복되지 않게).
+      백엔드가 대화 전체를 보내 주므로 따로 상태를 저장하지 않고 대사 글에서 계산한다."""
+    if all(c["id"] in revealed for c in s["clues"]):
+        return False
+    if not revealed:
+        return True
+    seen = {c["id"] for c in s["clues"] if c.get("at_opening")}
+    ai_lines = [m for m in messages if m.role == "ai"]
+    # 첫 대사가 대화에 들어 있으면 뺀다 (백엔드가 첫 대사를 빼고 보내도 맞게 세도록, 글이 같을 때만)
+    if ai_lines and ai_lines[0].text.strip() == s["opening_line"].strip():
+        ai_lines = ai_lines[1:]
+    clueless = 0
+    for m in ai_lines:
+        # 백엔드가 '드러났다'고 알려 준 단서(revealed)의 말이 처음 나온 대사만 단서를 드러낸 대사로 센다
+        # ('괜찮아요'처럼 아직 안 드러난 단서의 흔한 키워드가 있다고 단서 대사로 치지 않음)
+        new = {c["id"] for c in s["clues"]
+               if c["id"] in revealed and c["id"] not in seen and has_clue_keyword(m.text, c["id"])}
+        if new:
+            seen |= new
+            clueless = 0
+        else:
+            clueless += 1
+    return clueless >= MAX_CLUELESS_TURNS
+
+
+def is_friend_role(s: dict) -> bool:
+    """상대가 친구(같은 반·학원·게임 친구)인지. 아이도 반말로 답한다. 선배·사장님·기관에는 존댓말."""
+    return "친구" in s.get("ai_role", {}).get("name", "")
+
+
+def child_speech_lines(s: dict) -> list[str]:
+    """선택지(아이가 하는 말)의 말투 안내."""
+    if is_friend_role(s):
+        return ["- 상대가 친구라서 아이는 반말로 말해. 세 답 모두 반말로 써('~해요' 말고 '~해', '~할래'). "
+                "아래 예시가 존댓말이어도 반말로 바꿔 써."]
+    return ["- 아이는 상대에게 존댓말로 말해('~해요')."]
+

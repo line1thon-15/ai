@@ -52,6 +52,17 @@ NORMAL_GENERIC = {
     "doubtful": "괜찮은 것 같긴 한데, 조금 불안해요.",
     "other": "좋아요. 그럼 그렇게 할게요.",
 }
+# 정상 상황에서 상대가 친구일 때 (아이도 반말로 답한다)
+NORMAL_GENERIC_CASUAL = {
+    "correct": "이거 좀 이상해. 안 할래.",
+    "doubtful": "괜찮은 것 같긴 한데, 좀 불안해.",
+    "other": "좋아. 그럼 그렇게 할게.",
+}
+
+
+def normal_generic(s: dict) -> dict:
+    """정상 상황 공통 선택지. 상대가 친구면 반말, 아니면(사장님·선생님·기관) 존댓말."""
+    return dict(NORMAL_GENERIC_CASUAL if "친구" in s.get("ai_role", {}).get("name", "") else NORMAL_GENERIC)
 
 
 def template_texts(clue_id: str | None) -> dict:

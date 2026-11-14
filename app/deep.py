@@ -22,6 +22,7 @@ MAX_SENTENCES = 3
 JUDGING_WORDS = ("정답", "오답", "틀렸", "틀린", "맞았", "점수", "등급", "만점")
 # 길이: 한 문장은 짧게, 전체도 화면 한 칸에 들어가게 (느린 학습자가 끝까지 읽을 수 있는 길이)
 MAX_SENTENCE_CHARS = 60
+MIN_SENTENCE_CHARS = 8  # 이 길이 이하의 짧은 문장(예: "아주 칭찬해요.")은 앞 문장에 붙인다
 MAX_TOTAL_CHARS = 130
 # 어려운 표현: 법·금융 용어와 범죄 용어. 단서 설명(이름·설명·대처)에 이미 있는 말은 허용한다
 HARD_WORDS = ("보이스피싱", "피싱", "대포통장", "대포폰", "명의도용", "범죄", "처벌", "공범", "수거책", "악성", "자금",
@@ -135,7 +136,15 @@ def parse(raw: str, allowed: str = "") -> list[str] | None:
             text = clean_text(item)
         except TypeError:
             return None
-        out += [x.strip() for x in split_sentences(text) if x.strip()] if text else []
+        for x in (split_sentences(text) if text else []):
+            x = x.strip()
+            if not x:
+                continue
+            # '아주 칭찬해요.'처럼 아주 짧은 문장은 따로 세우면 어색하다 → 앞 문장에 붙인다
+            if out and len(x) <= MIN_SENTENCE_CHARS:
+                out[-1] = f"{out[-1]} {x}"
+            else:
+                out.append(x)
     out = out[:MAX_SENTENCES]
     if not out or any(sentence_problem(x, allowed) for x in out):
         return None

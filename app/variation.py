@@ -13,10 +13,11 @@ import random
 from pydantic import ValidationError
 
 from .content import load_all_scenarios
+from .choices import normalize_choice
 from .jsonutil import clean_text, parse_json_object
 from .providers import LLMProvider, QuotaExceeded
-from .scenarios import CLUE_DEFS, InvalidVariant, base_as_variant, check_variant, get_base
-from .schemas import AiRole, ClueVariant, Variant, VariantRequest, VariantResponse
+from .scenarios import CLUE_DEFS, InvalidVariant, base_as_variant, check_variant, get_base, opening_choices_problems
+from .schemas import AiRole, ClueVariant, OpeningChoices, Variant, VariantRequest, VariantResponse
 
 MAX_ATTEMPTS = 2
 
@@ -28,6 +29,7 @@ PLATFORM_NAMES = {
     "job_board": "채용 사이트 공고",
     "game_chat": "게임 속 채팅(귓속말)",
     "school_notice": "학교 알림장",
+    "messenger": "메신저 대화(아는 친구)",
 }
 
 
@@ -47,6 +49,9 @@ class Variator:
         axes = base["variation_axes"]
         for field in ("platform", "tone", "context"):
             value = getattr(req, field)
+            # 정상 상황은 자기 플랫폼을 그대로 쓰므로, 부모 시나리오의 축에 없어도 원래 플랫폼이면 통과
+            if field == "platform" and base.get("kind") == "normal" and value == base["platform"]:
+                continue
             if value is not None and value not in axes[field]:
                 raise InvalidAxis(field)
 
@@ -93,10 +98,16 @@ def build_prompt(base: dict, platform: str, tone: str, context: str) -> str:
         "",
         "[단서] 순서와 뜻을 바꾸지 마. 각 단서마다 새 대사를 하나씩 써.",
     ]
-    for c in base["clues"]:
+    ids = [c["id"] for c in base["clues"]]
+    for i, c in enumerate(base["clues"]):
         d = CLUE_DEFS[c["id"]]
         opening = " (첫 대사에도 반드시 드러나야 함)" if c.get("at_opening") else ""
-        lines.append(f"- {c['id']}: {d['description']}{opening} / 원본 대사: {c['reveal_line']}")
+        # 뒤에 나올 단서의 말이 이 대사(와 첫 대사)에 섞이면 검사에서 떨어진다 → 쓰지 말 말을 미리 알려 준다
+        later = sorted({k for x in ids[i + 1:] for k in CLUE_DEFS[x].get("keywords", [])})
+        avoid = f" / 이 대사{'와 첫 대사' if c.get('at_opening') else ''}에 쓰지 말 말: {', '.join(later)}" if later else ""
+        # 대사에 이 단서의 말이 하나는 있어야 '드러났다'고 인정된다 → 꼭 넣을 말도 알려 준다
+        must = f" / 이 대사에 꼭 넣을 말(하나 이상): {', '.join(d.get('keywords', []))}"
+        lines.append(f"- {c['id']}: {d['description']}{opening} / 원본 대사: {c['reveal_line']}{must}{avoid}")
     lines += ["", "[규칙]"]
     lines += [f"- {r}" for r in base["ai_rules"]]
     lines += [
@@ -104,11 +115,23 @@ def build_prompt(base: dict, platform: str, tone: str, context: str) -> str:
         "- 단서를 빼거나 약하게 만들지 마. 새로운 위험 요소를 더하지도 마.",
         "- 실제 회사, 기관, 사람 이름은 쓰지 마.",
         "",
+        "[시작 선택지] 첫 대사를 들은 아이가 고를 답 3개야. 바뀐 상황에 맞게 새로 써.",
+        "- correct: 첫 대사의 위험한 점을 말하고 분명히 거절하는 말 ('안 할래요', '안 해'처럼 거절이 꼭 들어가야 해) / "
+        "doubtful: 이상하다고 느끼지만 결국 따르는 말 ('좀 이상한데, 그래도 해 볼게요') / other: 의심 없이 그대로 따르는 말",
+        "- 아이가 하는 말이니까 아이 말투로, 각각 한 문장, 40자 이내, '.'으로 끝내. 물음표는 쓰지 마. 세 답 길이를 비슷하게.",
+    ]
+    first = next((c["id"] for c in base["clues"] if c.get("at_opening")), None)
+    if base.get("opening_choices") or first:
+        oc = base.get("opening_choices") or CLUE_DEFS[first]["choice_templates"]
+        lines.append(f"- 원본 예: correct \"{oc['correct']}\" / doubtful \"{oc['doubtful']}\" / other \"{oc['other']}\"")
+    lines += [
+        "",
         "출력은 아래 JSON 한 개만 써. 다른 글은 쓰지 마.",
         '{"title": "새 제목", "child_setup": "아이에게 보여 줄 상황 설명 1~2문장", '
         '"ai_role": {"name": "상대 역할 이름", "persona": "성격 한 문장"}, '
         '"opening_line": "첫 대사", '
-        '"clues": [{"id": "단서 id", "reveal_line": "그 단서를 드러내는 새 대사"}]}',
+        '"clues": [{"id": "단서 id", "reveal_line": "그 단서를 드러내는 새 대사"}], '
+        '"opening_choices": {"correct": "...", "doubtful": "...", "other": "..."}}',
     ]
     return "\n".join(lines)
 
@@ -171,4 +194,15 @@ def to_variant(raw: str, base: dict, platform: str, tone: str, context: str) -> 
         )
     except (KeyError, TypeError, ValidationError):
         return None
+    # 시작 선택지는 따로 검사한다. 틀리거나 상황과 안 맞으면 변형 전체를 버리지 않고 선택지만 뺀다
+    # (그러면 start 는 첫 단서의 선택지 예시를 쓴다. 원본 상황의 선택지는 쓰지 않음)
+    oc = data.get("opening_choices") if base.get("kind") != "normal" else None
+    if isinstance(oc, dict):
+        try:
+            texts = {k: normalize_choice(clean_text(oc[k])) for k in ("correct", "doubtful", "other")}
+            variant.opening_choices = OpeningChoices(**texts)
+        except (KeyError, TypeError, ValidationError):
+            variant.opening_choices = None
+        if variant.opening_choices is not None and opening_choices_problems(base, variant):
+            variant.opening_choices = None
     return None if check_variant(base, variant) else variant

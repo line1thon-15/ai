@@ -9,6 +9,14 @@ from app.config import Config, ConfigError
 from app.providers import FakeProvider, GeminiProvider, build_provider
 
 
+def _sdk_installed() -> bool:
+    """google-genai 가 설치됐는지. google 패키지 자체가 없으면 find_spec 이 ModuleNotFoundError 를 내므로 잡는다."""
+    try:
+        return importlib.util.find_spec("google.genai") is not None
+    except ModuleNotFoundError:
+        return False
+
+
 @pytest.fixture
 def fake_sdk(monkeypatch):
     calls = {}
@@ -65,13 +73,26 @@ def test_gemini_request_shape(fake_sdk):
     assert fake_sdk["model"] == "gemini-2.5-flash" and fake_sdk["contents"] == "프롬프트"
     assert fake_sdk["config"]["response_mime_type"] == "application/json"
     assert fake_sdk["config"]["thinking_config"].kw == {"thinking_budget": 0}
+    assert fake_sdk["config"]["temperature"] == 0.8
     assert fake_sdk["config"]["automatic_function_calling"].kw == {"disable": True}
 
 
-def test_other_models_get_no_thinking_setting(fake_sdk):
-    GeminiProvider(api_key="k", model="gemini-3-flash").generate("p")
-    assert "thinking_config" not in fake_sdk["config"]
+def test_gemini3_uses_lowest_thinking_level(fake_sdk):
+    """3.8 Flash 는 생각을 끌 수 없고 'minimal'도 오류라, 가장 낮은 'low'로 줄인다."""
+    GeminiProvider(api_key="k", model="gemini-3.8-flash").generate("p")
+    assert fake_sdk["config"]["thinking_config"].kw == {"thinking_level": "low"}
     assert "response_mime_type" not in fake_sdk["config"]
+    assert "temperature" not in fake_sdk["config"]  # Gemini 3 는 기본 temperature(1.0) 권장
+
+
+def test_other_models_get_no_thinking_setting(fake_sdk):
+    GeminiProvider(api_key="k", model="gemini-pro-x").generate("p")
+    assert "thinking_config" not in fake_sdk["config"]
+
+
+def test_default_model_is_38_flash():
+    from app.config import DEFAULT_GEMINI_MODEL
+    assert DEFAULT_GEMINI_MODEL == "gemini-3.8-flash"
 
 
 def test_empty_text_becomes_empty_string(fake_sdk):
@@ -84,7 +105,7 @@ def test_build_provider_fake():
     assert isinstance(build_provider(Config.from_env({"AI_INTERNAL_TOKEN": "t"})), FakeProvider)
 
 
-@pytest.mark.skipif(importlib.util.find_spec("google.genai") is not None, reason="SDK 가 설치된 환경")
+@pytest.mark.skipif(_sdk_installed(), reason="SDK 가 설치된 환경")
 def test_missing_sdk_gives_install_hint():
     cfg = Config.from_env({"AI_INTERNAL_TOKEN": "t", "AI_PROVIDER": "gemini", "GEMINI_API_KEY": "k"})
     with pytest.raises(ConfigError, match="pip install"):

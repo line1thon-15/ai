@@ -24,10 +24,12 @@ def test_mask_replaces_values():
 def _content_lines():
     for c in load_clues()["clues"]:
         yield from c["example_lines"]
-    for s in load_scenarios("scam")["scenarios"]:
-        yield s["opening_line"]
-        yield from (c["reveal_line"] for c in s["clues"])
-        yield from (n["opening_line"] for n in s["normal_situations"])
+    for area in ("scam", "identity_lending", "friend_pressure"):
+        for s in load_scenarios(area)["scenarios"]:
+            yield s["opening_line"]
+            yield from (c["reveal_line"] for c in s["clues"])
+            yield from (n["opening_line"] for n in s["normal_situations"])
+            yield from (n["fallback_line"] for n in s["normal_situations"] if n.get("fallback_line"))
 
 
 @pytest.mark.parametrize("line", list(_content_lines()))

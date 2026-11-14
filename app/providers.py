@@ -29,14 +29,32 @@ class GeminiProvider:
             http_options=types.HttpOptions(timeout=int(timeout_s * 1000)),  # 밀리초
         )
 
+    def _thinking_config(self):
+        """짧은 대사·요약이라 생각(thinking)을 최소로 해야 빠르고 싸다.
+        - 2.5 Flash: thinking_budget=0 으로 끈다.
+        - Gemini 3 계열(3.8 Flash 등): 끌 수 없고 thinking_level 로 줄인다. 3.8·3.7 Flash 는 'minimal'을 지원하지 않아
+          (오류) 모든 3 계열이 지원하는 가장 낮은 값 'low'를 쓴다.
+        - 설치된 SDK 가 thinking_level 을 모르면(오래된 버전) 설정 없이 보낸다 (기본값으로 동작)."""
+        if self._model.startswith("gemini-2.5-flash"):
+            return self._types.ThinkingConfig(thinking_budget=0)
+        if self._model.startswith("gemini-3"):
+            try:
+                return self._types.ThinkingConfig(thinking_level="low")
+            except (TypeError, ValueError):
+                return None
+        return None
+
     def generate(self, prompt: str, *, json_mode: bool = False) -> str:
         # 생각(thinking) 토큰이 출력 한도를 먹어 빈 답이 나오지 않도록 한도를 넉넉히 둔다
-        options = {"temperature": 0.8, "max_output_tokens": 2048}
+        options = {"max_output_tokens": 2048}
+        if not self._model.startswith("gemini-3"):
+            # Gemini 3 계열은 기본값(1.0)을 쓰라고 권장한다 (1.0 아래로 바꾸면 반복·품질 저하가 생길 수 있음)
+            options["temperature"] = 0.8
         if json_mode:
             options["response_mime_type"] = "application/json"
-        if self._model.startswith("gemini-2.5-flash"):
-            # 2.5 Flash 는 생각을 끌 수 있다: 짧은 대사라 끄는 편이 빠르고 싸다
-            options["thinking_config"] = self._types.ThinkingConfig(thinking_budget=0)
+        thinking = self._thinking_config()
+        if thinking is not None:
+            options["thinking_config"] = thinking
         # 함수 호출 기능은 쓰지 않는다 (SDK 의 AFC 경고 문구도 사라진다)
         options["automatic_function_calling"] = self._types.AutomaticFunctionCallingConfig(disable=True)
         try:

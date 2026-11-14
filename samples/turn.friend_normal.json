@@ -1,0 +1,14 @@
+{
+  "scenario_id": "normal_study_together_01",
+  "messages": [
+    {
+      "role": "ai",
+      "text": "수학 숙제 어려운데, 내일 도서관에서 같이 풀래? 시간 안 되면 괜찮아."
+    },
+    {
+      "role": "child",
+      "text": "좋아, 몇 시에 만날까?"
+    }
+  ],
+  "revealed_clue_ids": []
+}

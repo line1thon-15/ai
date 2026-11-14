@@ -1,0 +1,16 @@
+{
+  "scenario_id": "identity_phone_senior_01",
+  "messages": [
+    {
+      "role": "ai",
+      "text": "야, 부탁 하나만 하자. 네 이름으로 휴대폰 하나만 개통해 줘."
+    },
+    {
+      "role": "child",
+      "text": "왜 내 이름으로 만들어야 해?"
+    }
+  ],
+  "revealed_clue_ids": [
+    "lend_identity"
+  ]
+}

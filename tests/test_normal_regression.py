@@ -14,7 +14,7 @@ from app.judge import Judge, normal_feedback_problem
 from app.practice import PracticeEngine
 from app.providers import FakeProvider
 from app.scenarios import base_as_variant, check_variant
-from app.schemas import FeedbackRequest, Message, TurnRequest, VariantRequest
+from app.schemas import FeedbackRequest, JudgeRequest, Message, TurnRequest, VariantRequest
 from app.variation import Variator
 
 S = load_all_scenarios()
@@ -212,6 +212,106 @@ def test_original_normal_texts_have_no_risk_request(nid):
         assert normal_risk_hits(text) == [], text
 
 
+@pytest.mark.parametrize("nid", [k for k, s in S.items() if s.get("kind") == "normal"])
+def test_normal_fallback_line_fits_situation(nid):
+    """T-29: 모델이 실패하면 정상 상황마다 정한 고정 대사를 쓴다 (친구 사이는 반말 등)."""
+    s = S[nid]
+    p = FakeProvider("not json")
+    res = PracticeEngine(p).turn(TurnRequest(scenario_id=nid, messages=[
+        Message(role="ai", text=s["opening_line"]), Message(role="child", text="음, 잘 모르겠어요.")]))
+    assert res.source == "fallback" and res.reply == (s.get("fallback_line") or res.reply)
+    assert normal_risk_hits(res.reply) == []
+
+
+# ---- T-29 백엔드 리뷰: 첫 대사에서 첫 단서 공개, 단서 없는 응답 처리, 전체 흐름 ----------------------
+RISK_IDS = [k for k, s in S.items() if s.get("kind") == "risk"]
+
+
+@pytest.mark.parametrize("sid", RISK_IDS)
+def test_start_reveals_first_clue(sid):
+    s = S[sid]
+    r = PracticeEngine(FakeProvider("x")).start(sid)
+    first = s["clues"][0]["id"]
+    assert r.revealed_clue_ids == [first] and r.target_clue_id == first
+    if s.get("opening_choices"):
+        assert {c.kind: c.text for c in r.choices} == s["opening_choices"]
+
+
+@pytest.mark.parametrize("sid", RISK_IDS)
+def test_turn_without_any_clue_regenerates(sid):
+    """드러난 단서가 하나도 없을 때 모델이 단서를 빠뜨리면 다시 생성하고, 그래도 없으면 준비된 단서 대사."""
+    s = S[sid]
+    no_clue = json.dumps({"reply": "그렇구나. 더 궁금한 거 있어?", "revealed_clue_ids": [],
+                          "choices": {"correct": "이상해서 안 할래.", "doubtful": "좀 이상한데 해 볼게.",
+                                      "other": "좋아, 할게."}}, ensure_ascii=False)
+    p = FakeProvider(no_clue)
+    t = PracticeEngine(p).turn(TurnRequest(scenario_id=sid, revealed_clue_ids=[], messages=[
+        Message(role="ai", text="안녕"), Message(role="child", text="응?")]))
+    assert p.calls == 2 and t.source == "fallback" and len(t.revealed_clue_ids) == 1
+
+
+def _child(choice, target):
+    return Message(role="child", text=choice.text, choice_kind=choice.kind, clue_id=target)
+
+
+@pytest.mark.parametrize("sid", RISK_IDS)
+def test_flow_start_correct_judge_feedback(sid):
+    """start → 첫 선택(correct) → judge → feedback: 백엔드는 correct 에서 연습을 끝내므로, 첫 단서는 '찾음'."""
+    s = S[sid]
+    eng, judge = PracticeEngine(FakeProvider("x")), Judge(FakeProvider("x"), S)
+    st = eng.start(sid)
+    pick = next(c for c in st.choices if c.kind == "correct")
+    msgs = [Message(role="ai", text=st.reply), _child(pick, st.target_clue_id)]
+    j = judge.judge(JudgeRequest(scenario_id=sid, messages=msgs, revealed_clue_ids=st.revealed_clue_ids))
+    first = s["clues"][0]["id"]
+    assert j.source == "choices"
+    assert {r.clue_id: r.result for r in j.results}[first] == "found"
+    assert all(r.result == "not_shown" for r in j.results if r.clue_id != first)
+    fb = judge.feedback(FeedbackRequest(scenario_id=sid, results=j.results))
+    assert [c.clue_id for c in fb.cards] == [first] and fb.cards[0].result == "found"
+
+
+@pytest.mark.parametrize("sid", RISK_IDS)
+def test_flow_start_other_turn_judge_feedback(sid):
+    """start → 첫 선택(other) → turn(다음 단서) → judge → feedback."""
+    s = S[sid]
+    eng, judge = PracticeEngine(FakeProvider("x")), Judge(FakeProvider("x"), S)
+    st = eng.start(sid)
+    pick = next(c for c in st.choices if c.kind == "other")
+    msgs = [Message(role="ai", text=st.reply), _child(pick, st.target_clue_id)]
+    tr = eng.turn(TurnRequest(scenario_id=sid, messages=msgs, revealed_clue_ids=st.revealed_clue_ids))
+    assert tr.status == "ok" and len(tr.revealed_clue_ids) == 2 and len(tr.choices) == 3
+    msgs.append(Message(role="ai", text=tr.reply))
+    j = judge.judge(JudgeRequest(scenario_id=sid, messages=msgs, revealed_clue_ids=tr.revealed_clue_ids))
+    res = {r.clue_id: r.result for r in j.results}
+    assert res[s["clues"][0]["id"]] == "missed"
+    assert sum(v != "not_shown" for v in res.values()) == 2
+    fb = judge.feedback(FeedbackRequest(scenario_id=sid, results=j.results))
+    assert len(fb.cards) == 2
+
+
+# ---- T-29 검수 v2: 아이의 말에 맞는 단서로 이어 가기 (모델이 실패했을 때도) --------------------
+@pytest.mark.parametrize("child,expected", [
+    ("부모님께 먼저 물어볼게요.", "keep_secret"),
+    ("그거 위험한 거 아니에요?", "no_risk_claim"),
+    ("좀 생각해 볼게요.", "urgency"),
+    ("음.", "lend_identity"),  # 맞는 단서가 없으면 시나리오 순서대로
+])
+def test_fallback_follows_child_reaction(child, expected):
+    sid = "identity_dm_account_01" if expected == "urgency" else "identity_phone_senior_01"
+    s = S[sid]
+    t = PracticeEngine(FakeProvider("not json")).turn(TurnRequest(scenario_id=sid, messages=[
+        Message(role="ai", text=s["opening_line"]), Message(role="child", text=child)]))
+    first = s["clues"][0]["id"]
+    assert t.source == "fallback" and t.revealed_clue_ids == [expected if child != "음." else first]
+
+
+def test_every_clue_has_triggers():
+    from app.content import load_clues
+    for c in load_clues()["clues"]:
+        assert c.get("triggers"), c["id"]
+
+
 # ---- 백엔드 3차 리뷰: 뒤에 붙은 '마세요' 같은 다른 부정 때문에 요구가 통과하면 안 된다 ----------------
 BYPASS = [
     "비밀번호를 알려 주세요, 잊지 마세요.",
@@ -264,3 +364,289 @@ def test_bypass_blocked_in_normal_feedback(text):
     p = FakeProvider(json.dumps({"feedback": text}, ensure_ascii=False))
     res = Judge(p, S).feedback(FeedbackRequest(scenario_id="normal_game_support_01", normal_outcome="over_warned"))
     assert res.source == "fallback"
+
+
+# ---- PR #2 추가 리뷰 1: 변형하면 시작 선택지도 바뀐 상황에 맞아야 한다 ---------------------------
+from app.schemas import OpeningChoices, Variant  # noqa: E402
+from app.scenarios import opening_choices_problems, resolve  # noqa: E402
+
+HW = S["friend_homework_01"]  # 원본: 수학 숙제 대신 해 주기
+GAME = {"title": "게임 레벨을 대신 올려 달라는 친구",
+        "child_setup": "같은 반 친구가 메신저로 게임 레벨을 대신 올려 달라고 해요.",
+        "opening_line": "야, 너 게임 잘하잖아. 내 캐릭터 레벨 좀 대신 올려 줘.",
+        "ai_role": {"name": "같은 반 친구 '태오'", "persona": "친한 척 조르는 같은 반 친구."}}
+GOOD_OC = {"correct": "레벨을 대신 올려 주는 건 안 돼. 네가 해.", "doubtful": "좀 귀찮긴 한데, 이번만 올려 줄게.",
+           "other": "응, 그 정도는 내가 올려 줄게."}
+
+
+def _game_variant(oc=None):
+    v = base_as_variant(HW).model_dump()
+    v.update(title=GAME["title"], child_setup=GAME["child_setup"], opening_line=GAME["opening_line"],
+             context="게임 레벨 대신 올려 주기", opening_choices=oc)
+    v["ai_role"].update(GAME["ai_role"])
+    return Variant(**v)
+
+
+def test_variant_with_original_choices_is_rejected():
+    """원본(숙제) 선택지를 그대로 단 변형은 상황과 안 맞는다."""
+    v = _game_variant(HW["opening_choices"])
+    assert any(p.startswith("opening_choices:mismatch") for p in check_variant(HW, v))
+    with pytest.raises(Exception):
+        PracticeEngine(FakeProvider("x")).start("friend_homework_01", v)
+
+
+def test_variant_without_choices_does_not_reuse_original():
+    v = _game_variant(None)
+    assert check_variant(HW, v) == [] and resolve(S, "friend_homework_01", v)["opening_choices"] is None
+    r = PracticeEngine(FakeProvider("x")).start("friend_homework_01", v)
+    assert all("숙제" not in c.text for c in r.choices) and r.target_clue_id == "burdensome_request"
+
+
+def test_model_choices_for_new_situation_are_used():
+    raw = json.dumps({**GAME, "clues": [{"id": c["id"], "reveal_line": c["reveal_line"]} for c in HW["clues"]],
+                      "opening_choices": GOOD_OC}, ensure_ascii=False)
+    res = Variator(FakeProvider(raw), S).generate(VariantRequest(scenario_id="friend_homework_01",
+                                                                 context="게임 레벨 대신 올려 주기"))
+    assert res.source == "model" and res.variant.opening_choices.model_dump() == GOOD_OC
+    r = PracticeEngine(FakeProvider("x")).start("friend_homework_01", res.variant)
+    assert {c.kind: c.text for c in r.choices} == GOOD_OC
+
+
+def test_model_stale_choices_are_dropped_not_the_variant():
+    raw = json.dumps({**GAME, "clues": [{"id": c["id"], "reveal_line": c["reveal_line"]} for c in HW["clues"]],
+                      "opening_choices": HW["opening_choices"]}, ensure_ascii=False)
+    res = Variator(FakeProvider(raw), S).generate(VariantRequest(scenario_id="friend_homework_01",
+                                                                 context="게임 레벨 대신 올려 주기"))
+    assert res.source == "model" and res.variant.opening_choices is None
+    r = PracticeEngine(FakeProvider("x")).start("friend_homework_01", res.variant)
+    assert all("숙제" not in c.text for c in r.choices)
+
+
+def test_original_choices_match_original_situation():
+    for sid, s in S.items():
+        if s.get("opening_choices"):
+            assert opening_choices_problems(s, base_as_variant(s)) == [], sid
+
+
+# ---- PR #2 추가 리뷰 2: 단서 없이 대화가 반복되지 않게 ---------------------------------------------
+NO_CLUE = json.dumps({"reply": "그건 나중에 알려 줄게.", "revealed_clue_ids": [],
+                      "choices": {"correct": "이상해서 안 할래.", "doubtful": "좀 이상한데 해 볼게.", "other": "좋아, 할게."}},
+                     ensure_ascii=False)
+
+
+def _turn(sid, messages, revealed, raw=NO_CLUE):
+    p = FakeProvider(raw)
+    return p, PracticeEngine(p).turn(TurnRequest(scenario_id=sid, messages=messages, revealed_clue_ids=revealed))
+
+
+def test_one_clueless_turn_is_allowed():
+    """아이의 질문에 답하는 턴처럼, 단서 없는 턴은 한 번은 허용한다."""
+    s = HW
+    p, t = _turn("friend_homework_01", [Message(role="ai", text=s["opening_line"]),
+                                        Message(role="child", text="왜?")], ["burdensome_request"])
+    assert t.source == "model" and t.revealed_clue_ids == ["burdensome_request"] and p.calls == 1
+
+
+def test_second_clueless_turn_in_a_row_forces_next_clue():
+    s = HW
+    msgs = [Message(role="ai", text=s["opening_line"]), Message(role="child", text="왜?"),
+            Message(role="ai", text="그건 나중에 알려 줄게."), Message(role="child", text="그래서 뭐?")]
+    p, t = _turn("friend_homework_01", msgs, ["burdensome_request"])
+    assert p.calls == 2 and t.source == "fallback"
+    assert t.revealed_clue_ids == ["burdensome_request", s["clues"][1]["id"]]
+
+
+def test_clueless_turn_allowed_again_after_a_reveal():
+    s = HW
+    msgs = [Message(role="ai", text=s["opening_line"]), Message(role="child", text="왜?"),
+            Message(role="ai", text="그건 나중에 알려 줄게."), Message(role="child", text="그래서 뭐?"),
+            Message(role="ai", text=s["clues"][1]["reveal_line"]), Message(role="child", text="싫어.")]
+    p, t = _turn("friend_homework_01", msgs, ["burdensome_request", s["clues"][1]["id"]])
+    assert t.source == "model" and p.calls == 1
+
+
+def test_no_forcing_when_all_clues_revealed():
+    s = HW
+    ids = [c["id"] for c in s["clues"]]
+    msgs = [Message(role="ai", text=s["opening_line"]), Message(role="child", text="싫어.")]
+    p, t = _turn("friend_homework_01", msgs, ids)
+    assert t.source == "model" and p.calls == 1
+
+
+# ---- 자체 리뷰 (PR #2 병합 전) -----------------------------------------------------------------
+from app.practice import must_reveal_now  # noqa: E402
+
+DM = S["identity_dm_account_01"]  # 단서: too_good_pay(첫 대사), lend_identity, no_risk_claim, urgency
+
+
+@pytest.mark.parametrize("text", [
+    "보증금은 걱정 없어요. 내일 3만 원만 가져오면 돼요.",   # 부정이 '걱정'에 붙었고, 돈 요구는 다음 문장
+    "송금은 어렵지 않아요, 앱에서 바로 보내면 돼요.",
+    "링크 누르는 거 어렵지 않으니까 지금 들어가 봐.",
+    "돈 먼저 보내 줘.",
+    "3만 원만 줘.",
+])
+def test_review_money_and_misattached_negation_rejected(text):
+    assert normal_risk_hits(text), text
+
+
+@pytest.mark.parametrize("text", [
+    "비밀번호는 안 물어봐요.", "보증금은 안 내도 돼요.", "링크는 안 보낼게요.", "계좌번호를 물어보는 게 아니에요.",
+    "빨리 안 정해도 괜찮아요.", "오늘까지 안 와도 돼요.", "할머니가 생일 용돈을 엄마에게 보내 두었다고 문자를 보내요.",
+])
+def test_review_short_negation_notices_pass(text):
+    assert normal_risk_hits(text) == [], text
+
+
+def test_review_common_keyword_does_not_count_as_reveal():
+    """'괜찮아요'(no_risk_claim 키워드)가 있어도, 백엔드가 드러났다고 하지 않은 단서는 단서 대사로 세지 않는다."""
+    msgs = [Message(role="ai", text=DM["opening_line"]), Message(role="child", text="음"),
+            Message(role="ai", text="궁금한 건 편하게 물어보세요. 괜찮아요."), Message(role="child", text="음")]
+    assert must_reveal_now(DM, ["too_good_pay"], msgs) is True
+
+
+def test_review_opening_omitted_from_messages():
+    msgs = [Message(role="child", text="음"), Message(role="ai", text="천천히 물어보세요."), Message(role="child", text="음")]
+    assert must_reveal_now(DM, ["too_good_pay"], msgs) is True
+
+
+def test_review_unclaimed_second_clue_is_cut_from_reply():
+    """모델이 lend_identity 만 드러냈다고 해도, 대사에 no_risk_claim 의 말이 있으면 그 문장은 빼고 내보낸다."""
+    raw = json.dumps({"reply": "통장을 한 달만 빌려주면 돼요. 아무 문제 없고 제가 다 책임질게요.",
+                      "revealed_clue_ids": ["lend_identity"],
+                      "choices": {"correct": "a.", "doubtful": "b.", "other": "c."}}, ensure_ascii=False)
+    _, t = _turn("identity_dm_account_01", [Message(role="ai", text=DM["opening_line"]),
+                                            Message(role="child", text="무슨 일이에요?")], ["too_good_pay"], raw)
+    assert t.revealed_clue_ids == ["too_good_pay", "lend_identity"]
+    assert "문제" not in t.reply and "책임" not in t.reply
+
+
+@pytest.mark.parametrize("nid", ["normal_school_prize_01", "normal_youth_labor_01", "normal_allowance_dad_01"])
+def test_review_normal_variant_with_own_platform(nid):
+    s = S[nid]
+    res = Variator(FakeProvider("not json"), S).generate(VariantRequest(scenario_id=nid, platform=s["platform"]))
+    assert res.variant.platform == s["platform"]
+
+
+def test_review_variant_leaking_later_clues_rejected():
+    v = base_as_variant(DM).model_dump()
+    v["opening_line"] = "하루 10분만 확인하면 5만 원 벌어요. 통장이랑 카드만 빌려주면 되고 아무 문제 없어요."
+    from app.schemas import Variant as V
+    assert any(p.startswith("leak:too_good_pay") for p in check_variant(DM, V(**v)))
+    assert check_variant(DM, base_as_variant(DM)) == []
+
+
+def test_review_post_to_unknown_path_reads_body(start_server):
+    client = start_server(FakeProvider("x"))
+    status, _ = client.request("POST", "/health", {"x": "y" * 2000})
+    assert status == 405
+    status, _ = client.request("POST", "/nope", {"x": "y" * 2000})
+    assert status == 404
+
+
+# ---- 실제 Gemini 변형 출력 (debug_variant.py, 2026-11-15) ---------------------------------------
+# 1·3번은 '재료비 … 먼저 내 줘'처럼 써서 advance_payment 키워드가 없다고 떨어졌다 → 키워드 보강 후 통과해야 한다.
+# 2번은 advance_payment 대사의 '바로 다시 돌려줄게'에 urgency 의 말(바로)이 섞여 떨어지는 게 맞다.
+GEMINI_VARIANTS = json.loads('[{"title": "오픈채팅으로 온 꿀알바 제안", "child_setup": "용돈이 필요해서 알바를 찾던 너에게, 오픈채팅으로 모르는 사람이 알바를 제안해왔어.", "ai_role": {"name": "알바 담당 \'이 팀장\'", "persona": "친절하고 말이 빠르며, 네가 망설이면 더 좋은 조건을 말하며 밀어붙여."}, "opening_line": "안녕! 집에서 폰으로 물건 포장만 하면 돼. 하루 2시간만 일하고 하루에 20만 원 벌 수 있어! 관심 있어?", "clues": [{"id": "too_good_pay", "reveal_line": "하루 두 시간이면 되고, 한 달에 400만 원도 벌 수 있어."}, {"id": "advance_payment", "reveal_line": "시작하려면 재료비 3만 원만 먼저 내 줘. 일 시작하면 다시 돌려줄게!"}, {"id": "urgency", "reveal_line": "오늘까지만 사람 뽑으니까, 지금 바로 알려줘야 해."}, {"id": "keep_secret", "reveal_line": "이 일은 부모님한테는 말하지 마. 알면 일 못 하게 될 수도 있어."}], "opening_choices": {"correct": "돈 너무 많아서 수상한데요. 안 할게요.", "doubtful": "하루에 20만원이라니 좀 이상한데요.", "other": "네, 관심 있어요. 어떻게 하면 되나요."}}, {"title": "오픈채팅으로 온 물건 포장 알바 제안", "child_setup": "용돈이 필요해서 알바를 찾던 너에게, 오픈채팅으로 모르는 사람이 물건 포장 알바를 제안해.", "ai_role": {"name": "알바 담당 \'이 팀장\'", "persona": "친절하고 말이 빠른 사람이야. 네가 망설이면 더 좋은 조건을 말하며 밀어붙여."}, "opening_line": "안녕! 집에서 물건 포장만 하면 되는 알바인데, 하루에 20만 원 벌 수 있어. 관심 있어?", "clues": [{"id": "too_good_pay", "reveal_line": "하루에 2시간 정도만 해도 한 달에 400만 원도 벌 수 있어."}, {"id": "advance_payment", "reveal_line": "시작하기 전에 포장 재료비 3만 원만 보내주면 돼. 일 시작하면 바로 다시 돌려줄 거야."}, {"id": "urgency", "reveal_line": "이번 주까지만 사람을 뽑고 있어. 지금 바로 결정해야 해."}, {"id": "keep_secret", "reveal_line": "이 알바는 부모님께는 비밀로 해 줘. 혹시라도 알면 복잡해질 수 있어."}], "opening_choices": {"correct": "너무 쉬운데 돈을 많이 주는 것 같아요.", "doubtful": "뭔가 이상한데 일단 한번 물어볼래요.", "other": "네, 관심 있어요. 어떻게 하는 건가요."}}, {"title": "오픈채팅으로 온 꿀알바 제안", "child_setup": "용돈이 필요해서 알바를 찾던 너에게, 오픈채팅으로 모르는 사람이 메시지를 보냈어.", "ai_role": {"name": "알바짱 \'민지\'", "persona": "친구처럼 편하게 말하지만, 네가 망설이면 좋은 조건으로 빨리 결정하게 해."}, "opening_line": "안녕! 집에서 물건 포장만 하루 두 시간 정도 하면 돼. 하루에 20만 원 벌 수 있어! 관심 있어?", "clues": [{"id": "too_good_pay", "reveal_line": "하루 두 시간이면 되고, 한 달에 400만 원도 벌 수 있어."}, {"id": "advance_payment", "reveal_line": "시작하려면 포장 재료 준비금 3만 원만 먼저 내면 돼. 일 시작하면 다시 돌려줄 거야."}, {"id": "urgency", "reveal_line": "오늘까지만 사람 뽑으니까 지금 바로 결정해 줘!"}, {"id": "keep_secret", "reveal_line": "이 알바는 부모님한테는 말하지 말고 비밀로 해 줘. 알면 일 못 하게 될 수도 있어."}], "opening_choices": {"correct": "너무 돈을 많이 줘서 의심스러워.", "doubtful": "음, 좀 이상한데 일단 물어볼게.", "other": "네, 관심 있어요 어떻게 하는 건가요."}}]')
+
+
+def _variant_from_model(data):
+    return Variator(FakeProvider(json.dumps(data, ensure_ascii=False)), S).generate(
+        VariantRequest(scenario_id="scam_dm_parttime_01", platform="open_chat", tone="친구처럼 편한 말투",
+                       context="물건 포장 알바"))
+
+
+def test_gemini_variant_with_new_cost_words_passes():
+    res = _variant_from_model(GEMINI_VARIANTS[0])
+    assert res.source == "model" and res.variant.opening_choices is not None
+
+
+def test_gemini_variant_with_bad_choices_keeps_variant_drops_choices():
+    res = _variant_from_model(GEMINI_VARIANTS[2])
+    assert res.source == "model" and res.variant.opening_choices is None
+
+
+def test_gemini_variant_leaking_urgency_word_falls_back():
+    assert _variant_from_model(GEMINI_VARIANTS[1]).source == "fallback"
+
+
+# ---- PR #2 재리뷰 (901daa7) -----------------------------------------------------------------
+@pytest.mark.parametrize("text", [
+    "아빠가 용돈 보내줘서 너무 좋아.",      # 리뷰 사례: 이미 일어난 일
+    "아빠가 용돈 보내 줬어.",
+    "엄마가 돈 넣어 주셔서 고마워요.",
+    "용돈 3만 원 받았어.",
+])
+def test_rereview_past_money_events_are_not_requests(text):
+    assert normal_risk_hits(text) == [], text
+
+
+@pytest.mark.parametrize("text", ["돈 보내줘.", "3만 원 보내 주세요.", "3만 원만 줘.", "내일 3만 원만 가져오면 돼요."])
+def test_rereview_money_requests_still_caught(text):
+    assert "돈 요구" in normal_risk_hits(text), text
+
+
+def _raw_post(port, head_length, body):
+    import socket
+    s = socket.create_connection(("127.0.0.1", port), timeout=5)
+    s.sendall((f"POST /internal/v1/summary HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\n"
+               f"Content-Length: {head_length}\r\n\r\n").encode() + body)
+    return s
+
+
+def _recv_all(s) -> str:
+    """응답을 끝까지 받는다. Windows 에서는 헤더와 본문이 따로 도착해서 recv 한 번으로는 본문이 빠질 수 있다."""
+    chunks = []
+    while True:
+        part = s.recv(4096)
+        if not part:
+            break
+        chunks.append(part)
+    s.close()
+    return b"".join(chunks).decode("utf-8", "replace")
+
+
+def test_rereview_incomplete_body_times_out(start_server):
+    """Content-Length 만 크게 보내고 본문을 다 안 보내면, 제한 시간 뒤 408 로 끊는다 (스레드가 묶이지 않음)."""
+    import time
+    client = start_server(read_timeout=0.5)
+    port = int(client.base.rsplit(":", 1)[1])
+    s = _raw_post(port, 100, b'{"area":')
+    t0 = time.time()
+    data = _recv_all(s)
+    assert data.split("\r\n", 1)[0].split()[1] == "408" and "request_timeout" in data and time.time() - t0 < 4
+
+
+def test_rereview_body_closed_early_is_400(start_server):
+    import socket
+    client = start_server(read_timeout=2)
+    port = int(client.base.rsplit(":", 1)[1])
+    s = _raw_post(port, 100, b'{"area":')
+    s.shutdown(socket.SHUT_WR)  # 다 보내기 전에 보내기 쪽을 닫음
+    data = _recv_all(s)
+    # 보내는 쪽이 끊기면 서버는 기다리지 않고 바로 400(incomplete_body) 을 준다 (408 은 시간 초과일 때만)
+    assert data.split("\r\n", 1)[0].split()[1] == "400" and "incomplete_body" in data
+
+
+
+# ---- PR #2 재리뷰 (90e2a8e) ------------------------------------------------------------------
+from app.practice import child_speech_lines  # noqa: E402
+
+
+@pytest.mark.parametrize("sid", ["friend_homework_01", "friend_money_01", "normal_study_together_01"])
+def test_friend_turn_prompt_asks_casual_choices(sid):
+    """친구 역할은 다음 턴 선택지도 반말로 만들게 한다 (예시도 반말)."""
+    s = S[sid]
+    p = FakeProvider("x")
+    PracticeEngine(p).turn(TurnRequest(scenario_id=sid, messages=[
+        Message(role="ai", text=s["opening_line"]), Message(role="child", text="왜?")],
+        revealed_clue_ids=[c["id"] for c in s["clues"] if c.get("at_opening")]))
+    assert "반말로 말해" in p.last_prompt and "존댓말로 말해" not in p.last_prompt
+    if s.get("kind") == "normal":
+        assert "이거 좀 이상해. 안 할래." in p.last_prompt
+
+
+@pytest.mark.parametrize("sid", ["scam_dm_parttime_01", "identity_phone_senior_01", "normal_cafe_01"])
+def test_non_friend_turn_prompt_asks_polite_choices(sid):
+    s = S[sid]
+    assert child_speech_lines(s) == ["- 아이는 상대에게 존댓말로 말해('~해요')."]

@@ -26,6 +26,7 @@ from .variation import InvalidAxis, Variator
 log = logging.getLogger("ai.server")
 
 MAX_BODY_BYTES = 64 * 1024
+REQUEST_READ_TIMEOUT = 10  # 요청을 받는 동안 이 시간 넘게 아무것도 안 오면 408
 TOKEN_HEADER = "X-Internal-Token"
 
 
@@ -142,6 +143,8 @@ class _Handler(BaseHTTPRequestHandler):
     app: App  # make_server 에서 주입
     server_version = "ai-server"
     sys_version = ""
+    # 연결 소켓의 읽기 제한 시간(초). Content-Length 만 보내고 본문을 끝까지 안 보내는 요청에 스레드가 묶이지 않게 한다
+    timeout = REQUEST_READ_TIMEOUT
 
     def do_GET(self):
         self._dispatch("GET")
@@ -156,16 +159,32 @@ class _Handler(BaseHTTPRequestHandler):
         given = self.headers.get(TOKEN_HEADER, "")
         return hmac.compare_digest(given.encode(), self.app.internal_token.encode())
 
-    def _read_json(self):
+    def _read_body(self) -> bytes:
+        """본문을 먼저 끝까지 읽는다. 읽지 않은 채로 401 등을 보내고 연결을 닫으면
+        Windows 에서는 상대가 응답을 받기 전에 연결이 끊긴다(WinError 10053)."""
         try:
             length = int(self.headers.get("Content-Length") or 0)
         except ValueError:
             raise _HttpError(400, "bad_request") from None
-        if length <= 0:
-            raise _HttpError(400, "invalid_json")
         if length > MAX_BODY_BYTES:
+            self.close_connection = True  # 너무 큰 본문은 읽지 않고 연결을 닫는다
             raise _HttpError(413, "payload_too_large")
-        raw = self.rfile.read(length)
+        if length <= 0:
+            return b""
+        try:
+            raw = self.rfile.read(length)
+        except (TimeoutError, OSError):  # socket.timeout 포함
+            self.close_connection = True
+            raise _HttpError(408, "request_timeout") from None
+        if len(raw) < length:  # 본문이 다 오기 전에 연결이 끝남
+            self.close_connection = True
+            raise _HttpError(400, "incomplete_body")
+        return raw
+
+    @staticmethod
+    def _parse_json(raw: bytes):
+        if not raw:
+            raise _HttpError(400, "invalid_json")
         try:
             return json.loads(raw)
         except ValueError:  # JSONDecodeError, UnicodeDecodeError 포함
@@ -174,6 +193,8 @@ class _Handler(BaseHTTPRequestHandler):
     def _dispatch(self, method: str):
         path = self.path.split("?", 1)[0]
         try:
+            # 본문은 경로·인증 확인보다 먼저 읽는다 (404·405·401 에서도 Windows 연결 끊김이 생기지 않게)
+            raw = self._read_body() if method == "POST" else b""
             route = ROUTES.get((method, path))
             if route is None:
                 known = any(p == path for (_, p) in ROUTES)
@@ -181,7 +202,7 @@ class _Handler(BaseHTTPRequestHandler):
             needs_auth, handler = route
             if needs_auth and not self._authorized():
                 raise _HttpError(401, "unauthorized")
-            body = self._read_json() if method == "POST" else None
+            body = self._parse_json(raw) if method == "POST" else None
             status, payload = handler(self.app, body)
         except _HttpError as e:
             status, payload = e.status, {"error": e.code}
@@ -198,6 +219,7 @@ class _Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
 
-def make_server(app: App, host: str = "127.0.0.1", port: int = 8081) -> ThreadingHTTPServer:
-    handler = type("Handler", (_Handler,), {"app": app})
+def make_server(app: App, host: str = "127.0.0.1", port: int = 8081,
+                read_timeout: float = REQUEST_READ_TIMEOUT) -> ThreadingHTTPServer:
+    handler = type("Handler", (_Handler,), {"app": app, "timeout": read_timeout})
     return ThreadingHTTPServer((host, port), handler)

@@ -12,7 +12,8 @@
       "persona": "친절하고 차분한 사장님. 부모님과 함께 오라고 한다.",
       "tone": "친구처럼 편한 말투"
     },
-    "clues": []
+    "clues": [],
+    "opening_choices": null
   },
   "source": "model"
 }

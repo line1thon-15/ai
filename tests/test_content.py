@@ -26,7 +26,7 @@ def test_clue_is_complete(clue):
     for key in REQUIRED:
         assert clue.get(key), f"{clue['id']}: {key} 가 비어 있음"
     assert set(clue["areas"]) <= AREA_IDS
-    assert len(clue["name"]) <= 30, "이름은 한 문장으로 짧게"
+    assert len(clue["name"]) <= 35, "이름은 한 문장으로 짧게 (피드백·힌트 문장 안에 들어감)"
     assert len(clue["example_lines"]) >= 2
 
 

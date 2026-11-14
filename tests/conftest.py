@@ -34,9 +34,9 @@ def start_server():
     """서버를 임의 포트로 띄운다. provider 를 바꿔 끼울 수 있다."""
     started = []
 
-    def _start(provider=None):
+    def _start(provider=None, read_timeout=None):
         app = App(internal_token=TOKEN, provider=provider or FakeProvider(), provider_name="fake")
-        httpd = make_server(app, port=0)
+        httpd = make_server(app, port=0) if read_timeout is None else make_server(app, port=0, read_timeout=read_timeout)
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         started.append(httpd)
         return Client(f"http://127.0.0.1:{httpd.server_port}")
