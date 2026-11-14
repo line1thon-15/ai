@@ -46,7 +46,10 @@ class GeminiProvider:
 
     def generate(self, prompt: str, *, json_mode: bool = False) -> str:
         # 생각(thinking) 토큰이 출력 한도를 먹어 빈 답이 나오지 않도록 한도를 넉넉히 둔다
-        options = {"temperature": 0.8, "max_output_tokens": 2048}
+        options = {"max_output_tokens": 2048}
+        if not self._model.startswith("gemini-3"):
+            # Gemini 3 계열은 기본값(1.0)을 쓰라고 권장한다 (1.0 아래로 바꾸면 반복·품질 저하가 생길 수 있음)
+            options["temperature"] = 0.8
         if json_mode:
             options["response_mime_type"] = "application/json"
         thinking = self._thinking_config()

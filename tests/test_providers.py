@@ -73,6 +73,7 @@ def test_gemini_request_shape(fake_sdk):
     assert fake_sdk["model"] == "gemini-2.5-flash" and fake_sdk["contents"] == "프롬프트"
     assert fake_sdk["config"]["response_mime_type"] == "application/json"
     assert fake_sdk["config"]["thinking_config"].kw == {"thinking_budget": 0}
+    assert fake_sdk["config"]["temperature"] == 0.8
     assert fake_sdk["config"]["automatic_function_calling"].kw == {"disable": True}
 
 
@@ -81,6 +82,7 @@ def test_gemini3_uses_lowest_thinking_level(fake_sdk):
     GeminiProvider(api_key="k", model="gemini-3.8-flash").generate("p")
     assert fake_sdk["config"]["thinking_config"].kw == {"thinking_level": "low"}
     assert "response_mime_type" not in fake_sdk["config"]
+    assert "temperature" not in fake_sdk["config"]  # Gemini 3 는 기본 temperature(1.0) 권장
 
 
 def test_other_models_get_no_thinking_setting(fake_sdk):

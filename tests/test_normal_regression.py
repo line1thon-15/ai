@@ -594,6 +594,18 @@ def _raw_post(port, head_length, body):
     return s
 
 
+def _recv_all(s) -> str:
+    """응답을 끝까지 받는다. Windows 에서는 헤더와 본문이 따로 도착해서 recv 한 번으로는 본문이 빠질 수 있다."""
+    chunks = []
+    while True:
+        part = s.recv(4096)
+        if not part:
+            break
+        chunks.append(part)
+    s.close()
+    return b"".join(chunks).decode("utf-8", "replace")
+
+
 def test_rereview_incomplete_body_times_out(start_server):
     """Content-Length 만 크게 보내고 본문을 다 안 보내면, 제한 시간 뒤 408 로 끊는다 (스레드가 묶이지 않음)."""
     import time
@@ -601,9 +613,8 @@ def test_rereview_incomplete_body_times_out(start_server):
     port = int(client.base.rsplit(":", 1)[1])
     s = _raw_post(port, 100, b'{"area":')
     t0 = time.time()
-    data = s.recv(4096).decode("utf-8", "replace")
-    s.close()
-    assert "408" in data.split("\r\n", 1)[0] and time.time() - t0 < 4
+    data = _recv_all(s)
+    assert data.split("\r\n", 1)[0].split()[1] == "408" and "request_timeout" in data and time.time() - t0 < 4
 
 
 def test_rereview_body_closed_early_is_400(start_server):
@@ -612,6 +623,30 @@ def test_rereview_body_closed_early_is_400(start_server):
     port = int(client.base.rsplit(":", 1)[1])
     s = _raw_post(port, 100, b'{"area":')
     s.shutdown(socket.SHUT_WR)  # 다 보내기 전에 보내기 쪽을 닫음
-    data = s.recv(4096).decode("utf-8", "replace")
-    s.close()
-    assert data.split("\r\n", 1)[0].split()[1] in ("400", "408")
+    data = _recv_all(s)
+    # 보내는 쪽이 끊기면 서버는 기다리지 않고 바로 400(incomplete_body) 을 준다 (408 은 시간 초과일 때만)
+    assert data.split("\r\n", 1)[0].split()[1] == "400" and "incomplete_body" in data
+
+
+
+# ---- PR #2 재리뷰 (90e2a8e) ------------------------------------------------------------------
+from app.practice import child_speech_lines  # noqa: E402
+
+
+@pytest.mark.parametrize("sid", ["friend_homework_01", "friend_money_01", "normal_study_together_01"])
+def test_friend_turn_prompt_asks_casual_choices(sid):
+    """친구 역할은 다음 턴 선택지도 반말로 만들게 한다 (예시도 반말)."""
+    s = S[sid]
+    p = FakeProvider("x")
+    PracticeEngine(p).turn(TurnRequest(scenario_id=sid, messages=[
+        Message(role="ai", text=s["opening_line"]), Message(role="child", text="왜?")],
+        revealed_clue_ids=[c["id"] for c in s["clues"] if c.get("at_opening")]))
+    assert "반말로 말해" in p.last_prompt and "존댓말로 말해" not in p.last_prompt
+    if s.get("kind") == "normal":
+        assert "이거 좀 이상해. 안 할래." in p.last_prompt
+
+
+@pytest.mark.parametrize("sid", ["scam_dm_parttime_01", "identity_phone_senior_01", "normal_cafe_01"])
+def test_non_friend_turn_prompt_asks_polite_choices(sid):
+    s = S[sid]
+    assert child_speech_lines(s) == ["- 아이는 상대에게 존댓말로 말해('~해요')."]
