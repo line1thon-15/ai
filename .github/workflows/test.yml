@@ -1,0 +1,31 @@
+# push·PR 마다 전체 테스트를 돌린다. 실제 Gemini 는 부르지 않는다 (Fake 제공자, 키 없음).
+name: ai-tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # 팀 저장소에서 이 폴더가 ai/ 아래에 있으면 working-directory 를 ai 로 바꾸세요
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: pytest
+        env:
+          AI_PROVIDER: fake
+        run: python -m pytest -q --junitxml=pytest-report.xml
+      - name: 테스트 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-report
+          path: pytest-report.xml

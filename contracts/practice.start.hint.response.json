@@ -1,0 +1,30 @@
+{
+  "status": "ok",
+  "reply": "안녕하세요! 집에서 폰으로 하루 두 시간만 하면 되는 알바예요. 하루에 20만 원 벌 수 있어요. 관심 있으세요?",
+  "ai_role_name": "알바 모집 담당 '한 매니저'",
+  "title": "SNS로 온 쉬운 알바 제안",
+  "child_setup": "용돈이 필요해서 알바를 알아보던 아이에게, 모르는 사람이 SNS 쪽지로 알바를 제안해요.",
+  "revealed_clue_ids": [
+    "too_good_pay"
+  ],
+  "target_clue_id": "too_good_pay",
+  "choices": [
+    {
+      "id": "c1",
+      "text": "많이 줘서 이상하긴 한데, 그래도 해 볼게요.",
+      "kind": "doubtful"
+    },
+    {
+      "id": "c2",
+      "text": "이렇게 많이 주는 건 이상해요. 안 할래요.",
+      "kind": "correct"
+    },
+    {
+      "id": "c3",
+      "text": "그렇게 많이 준다니 좋아요. 바로 할게요.",
+      "kind": "other"
+    }
+  ],
+  "choices_source": "template",
+  "hint": "쉬운 일인데 돈을 아주 많이 준다는 말이 이상하지 않은지 생각해 봐요."
+}

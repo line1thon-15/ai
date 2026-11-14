@@ -1,0 +1,18 @@
+{
+  "scenario_id": "scam_game_item_01",
+  "revealed_clue_ids": [
+    "urgency"
+  ],
+  "messages": [
+    {
+      "role": "ai",
+      "text": "안녕! 너 그 전설 스킨 갖고 싶다고 했지? 오늘만 반값에 넘겨줄게."
+    },
+    {
+      "role": "child",
+      "text": "네! 늦기 전에 지금 바로 할게요.",
+      "choice_kind": "other",
+      "clue_id": "urgency"
+    }
+  ]
+}

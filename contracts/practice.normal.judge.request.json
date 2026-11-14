@@ -1,0 +1,16 @@
+{
+  "scenario_id": "normal_cafe_01",
+  "revealed_clue_ids": [],
+  "messages": [
+    {
+      "role": "ai",
+      "text": "안녕하세요, 우리 카페에서 주말 알바를 구해요. 친구 소개로 연락드렸어요. 시간 되면 부모님이랑 같이 가게에 와서 이야기해 볼래요?"
+    },
+    {
+      "role": "child",
+      "text": "좋아요. 그럼 그렇게 할게요.",
+      "choice_kind": "other",
+      "clue_id": null
+    }
+  ]
+}
