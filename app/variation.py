@@ -13,7 +13,7 @@ import random
 from pydantic import ValidationError
 
 from .content import load_all_scenarios
-from .choices import normalize_choice
+from .choices import is_friend, normalize_choice, template_texts
 from .jsonutil import clean_text, parse_json_object
 from .providers import LLMProvider, QuotaExceeded
 from .scenarios import CLUE_DEFS, InvalidVariant, base_as_variant, check_variant, get_base, opening_choices_problems
@@ -120,9 +120,11 @@ def build_prompt(base: dict, platform: str, tone: str, context: str) -> str:
         "doubtful: 이상하다고 느끼지만 결국 따르는 말 ('좀 이상한데, 그래도 해 볼게요') / other: 의심 없이 그대로 따르는 말",
         "- 아이가 하는 말이니까 아이 말투로, 각각 한 문장, 40자 이내, '.'으로 끝내. 물음표는 쓰지 마. 세 답 길이를 비슷하게.",
     ]
+    if is_friend(base["ai_role"]["name"]):
+        lines.append("- 상대가 친구라서 세 답 모두 반말로 써('~해요' 말고 '~해', '~할래').")
     first = next((c["id"] for c in base["clues"] if c.get("at_opening")), None)
     if base.get("opening_choices") or first:
-        oc = base.get("opening_choices") or CLUE_DEFS[first]["choice_templates"]
+        oc = base.get("opening_choices") or template_texts(first, is_friend(base["ai_role"]["name"]))
         lines.append(f"- 원본 예: correct \"{oc['correct']}\" / doubtful \"{oc['doubtful']}\" / other \"{oc['other']}\"")
     lines += [
         "",

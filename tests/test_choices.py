@@ -131,7 +131,9 @@ def test_prompt_asks_for_three_kinds():
 
 # ---- 길이 균형 (정답이 늘 가장 길면 길이만 보고 고를 수 있다) ------------------------
 
-ALL_TEMPLATES = [c["choice_templates"] for c in CLUES] + [GENERIC, NORMAL_GENERIC, NORMAL_GENERIC_CASUAL]
+ALL_TEMPLATES = ([c["choice_templates"] for c in CLUES]
+                 + [c["choice_templates_casual"] for c in CLUES if c.get("choice_templates_casual")]
+                 + [GENERIC, NORMAL_GENERIC, NORMAL_GENERIC_CASUAL])
 
 
 @pytest.mark.parametrize("texts", ALL_TEMPLATES)
@@ -246,3 +248,42 @@ def test_normalize_choice_reads_naturally(raw, expected):
 ])
 def test_correct_with_adult_needs_telling(correct, ok):
     assert (choice_problem({**GOOD, "correct": correct}) is None) is ok
+
+
+# ---- 친구에게는 반말 (배포 화면에서 2~4번째 선택지가 존댓말이던 문제) -----------------------
+
+from app.choices import GENERIC_CASUAL, polite_part, template_texts  # noqa: E402
+from app.content import load_all_scenarios  # noqa: E402
+from app.practice import is_friend_role  # noqa: E402
+
+FRIEND_RISK = [s for s in load_all_scenarios().values() if is_friend_role(s) and s.get("kind") != "normal"]
+
+
+@pytest.mark.parametrize("s", FRIEND_RISK, ids=lambda s: s["id"])
+def test_friend_scenarios_use_casual_templates_for_every_clue(s):
+    for c in s["clues"]:
+        texts = template_texts(c["id"], casual=True)
+        assert validate_texts(texts, casual=True) == texts, (c["id"], texts)
+    if s.get("opening_choices"):
+        assert validate_texts(s["opening_choices"], casual=True) is not None
+
+
+def test_generic_casual_is_valid():
+    assert validate_texts(GENERIC_CASUAL, casual=True) == GENERIC_CASUAL
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("이건 안 할래요.", "이건 안 할래요"),
+    ("알겠어요, 해 볼게.", "알겠어요"),
+    ("필요 없어. 안 할래.", None),
+    ("내가 해 줄게.", None),
+    ("그렇게 하겠습니다.", "그렇게 하겠습니다"),
+])
+def test_polite_part(text, expected):
+    assert polite_part(text) == expected
+
+
+def test_polite_model_choices_to_friend_fall_back_to_casual_templates():
+    polite = {"correct": "부담돼서 안 할래요.", "doubtful": "좀 부담되는데, 해 줄게요.", "other": "응, 그 정도는 해 줄게요."}
+    assert validate_texts(polite, casual=True) is None
+    assert validate_texts(polite, casual=False) is not None  # 선배·사장님에게는 존댓말이 맞다

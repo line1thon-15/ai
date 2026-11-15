@@ -35,9 +35,12 @@ def _focus_clues(s: dict, req: DeepFeedbackRequest) -> list[dict]:
     return [CLUE_DEFS[i] for i in chosen]
 
 
+DEEP_MAX_CHARS = 150  # 판단 이유 피드백(P2)은 결과 화면 카드와 따로 둔다
+
+
 def sentence_problem(text: str, allowed: str = "") -> str | None:
     """문장 하나의 문제. allowed: 단서 설명처럼 이미 아이에게 보여 준 글 (그 안의 말은 어려운 표현으로 보지 않음)."""
-    problem = feedback_problem(text)
+    problem = feedback_problem(text, DEEP_MAX_CHARS)
     if problem:
         return problem
     if len(text) > MAX_SENTENCE_CHARS:

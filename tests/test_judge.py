@@ -184,7 +184,36 @@ def test_long_card_and_closing_are_shortened_not_dropped():
         FeedbackRequest.model_validate(FEEDBACK_REQ))
     assert r.source == "model"
     assert r.cards[0].text == "와! 잘 생각했어요. 너무 좋은 조건은 의심해요."
-    assert r.closing_line == closing
+    assert r.cards[1].text == "정말 잘했어요! 돈은 먼저 보내지 않아요."
+    assert r.closing_line == "오늘 정말 잘했어요! 다음에도 같이 연습해요."
+
+
+# ---- 결과 화면은 짧게 (경계선 지능 청소년이 한눈에 읽도록) -----------------------------
+
+def test_too_long_card_and_closing_fall_back():
+    from app.judge import MAX_CARD_CHARS, MAX_CLOSING_CHARS
+    long_card = "쉬운 일인데 돈을 너무 많이 준다는 말은 사실 아주 위험한 신호라서 다음에는 꼭 어른과 함께 확인해야 해요."
+    long_closing = "오늘 끝까지 열심히 연습한 너의 모습이 정말 멋졌고 다음에도 꼭 같이 해 보자요."
+    assert len(long_card) > MAX_CARD_CHARS and len(long_closing) > MAX_CLOSING_CHARS
+    cards = [{"clue_id": "too_good_pay", "text": long_card},
+             {"clue_id": "advance_payment", "text": "돈을 먼저 내라는 말을 잘 알아챘어요!"}]
+    r = Judge(FakeProvider(feedback_reply(cards=cards, closing_line=long_closing))).feedback(
+        FeedbackRequest.model_validate(FEEDBACK_REQ))
+    assert r.cards[0].text == template(ClueResult(clue_id="too_good_pay", result="missed"))
+    assert r.cards[1].text == "돈을 먼저 내라는 말을 잘 알아챘어요!"
+    assert r.closing_line == DEFAULT_CLOSING
+
+
+@pytest.mark.parametrize("clue", [c["id"] for c in load_clues()["clues"]])
+@pytest.mark.parametrize("result", ["found", "missed"])
+def test_templates_are_short(clue, result):
+    from app.judge import MAX_CARD_CHARS
+    assert len(template(ClueResult(clue_id=clue, result=result))) <= MAX_CARD_CHARS
+
+
+def test_default_closing_is_short():
+    from app.judge import MAX_CLOSING_CHARS, feedback_problem
+    assert feedback_problem(DEFAULT_CLOSING, MAX_CLOSING_CHARS) is None
 
 
 def test_feedback_problem_reasons():
