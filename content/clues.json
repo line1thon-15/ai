@@ -481,6 +481,15 @@
       },
       "sources": [
         {
+          "org": "법제처 찾기쉬운 생활법령정보",
+          "title": "\"범죄행위에 사용하지 않는다\"라는 문구가 있는 광고를 보고 매월 일정 금액을 받기로 약속하고 통장을 빌려줬습니다. 통장을 단순히 빌려주기만 한 사람도 처벌 받나요?",
+          "url": "https://easylaw.go.kr/CSP/EasyLawInfoR.laf?csmSeq=901&easySeq=2391",
+          "date": "2026-09-15",
+          "evidence": "'범죄행위에 사용하지 않는다'는 광고 문구를 믿고 통장을 빌려준 경우를 다루며, '대가를 약속하고 접근매체를 대여하는 행위는 법 위반 행위로 처벌 받습니다'라고 안내함.",
+          "strength": "direct",
+          "source_type": "official"
+        },
+        {
           "org": "경찰청 국가수사본부 (경향신문 보도)",
           "title": "'고액 알바' 지원했다 '인간 대포통장'으로···보이스피싱 피의자 63% 청년구직자",
           "url": "https://www.khan.co.kr/article/202202211441001",
@@ -529,7 +538,17 @@
         "1": "내가 거절하면 상대가 어떻게 말하는지 살펴봐요.",
         "2": "미안한 마음이 들게 하는 말에 꼭 따라야 하는지 생각해 봐요."
       },
-      "sources": [],
+      "sources": [
+        {
+          "org": "한국형사·법무정책연구원 (기본연구보고서)",
+          "title": "가스라이팅 범죄의 특성 및 대응 강화 방안 (120쪽, 가스라이팅 행동 척도의 '감정 조작 및 자기비난 유도')",
+          "url": "https://www.nkis.re.kr/subject_view1.do?menuNo=103000&otpId=OTP_0000000000017633&otpSeq=0",
+          "date": "2025",
+          "source_type": "official",
+          "strength": "indirect",
+          "evidence": "가스라이팅 행동의 한 요인으로 '감정 조작 및 자기비난 유도'를 들고, 예로 '상대가 내 거짓말을 지적하면 상처받은 척하여 죄책감을 느끼게 만든 적이 있다'를 제시하며 이 척도가 친구 관계에도 쓰인다고 설명함. 부탁을 거절할 때 미안하게 만드는 상황을 직접 다루지는 않음."
+        }
+      ],
       "name": "안 해 주면 미안한 마음이 들게 해요",
       "description": "거절하면 서운하다, 너무하다는 식으로 죄책감을 느끼게 하는 것",
       "found_when": "미안해도 거절해도 된다고 말하거나, 거절하겠다고 고른다",
@@ -617,6 +636,15 @@
       },
       "sources": [
         {
+          "org": "교육부 학교폭력대책과",
+          "title": "2026학년도 학교폭력 사안처리 가이드북 (7쪽, 학교폭력 유형: 강요)",
+          "url": "https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=316&boardSeq=105456&lev=0&searchType=null&statusYN=W&page=1&s=moe&m=030214&opType=N",
+          "date": "2026-02-27",
+          "source_type": "official",
+          "strength": "direct",
+          "evidence": "학교폭력 '강요' 유형으로 '속칭 빵 셔틀, 와이파이 셔틀, 과제 대행, 게임 대행, 심부름 강요 등 의사에 반하는 행동을 강요하는 행위'를 듦."
+        },
+        {
           "org": "교육부·한국대학교육협의회",
           "title": "학교폭력 조치사항 대입 반영 가이드라인",
           "url": "https://kcue.or.kr/_upload/news/2024/08/29/application_5bcfbe188d06799e178f61e3a7eb0cb5.pdf",
@@ -681,6 +709,15 @@
           "evidence": "'의사에 반하는 행동을 강요하는 행위'를 학교폭력(강요)으로 규정함. 거절 후 계속 조르는 상황을 직접 다루지는 않음.",
           "strength": "indirect",
           "source_type": "official"
+        },
+        {
+          "org": "교육부 학교폭력대책과",
+          "title": "2026학년도 학교폭력 사안처리 가이드북 (7쪽, 학교폭력 유형: 강요)",
+          "url": "https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=316&boardSeq=105456&lev=0&searchType=null&statusYN=W&page=1&s=moe&m=030214&opType=N",
+          "date": "2026-02-27",
+          "source_type": "official",
+          "strength": "indirect",
+          "evidence": "'의사에 반하는 행동을 강요하는 행위'를 학교폭력(강요)으로 설명함. 싫다는 뜻을 무시하고 계속 조르는 것과 관련 있지만, 조르는 말 자체를 다루지는 않음."
         }
       ],
       "name": "싫다고 했는데 계속 졸라요",
