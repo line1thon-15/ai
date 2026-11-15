@@ -7,7 +7,7 @@ from app.content import clues_for_area, load_clues
 
 DATA = load_clues()
 AREA_IDS = {a["id"] for a in DATA["areas"]}
-REQUIRED = ["id", "areas", "name", "description", "found_when", "safe_action", "example_lines"]
+REQUIRED = ["id", "areas", "name", "description", "tip", "found_when", "safe_action", "example_lines"]
 
 
 def test_version_and_areas():
@@ -28,6 +28,7 @@ def test_clue_is_complete(clue):
     assert set(clue["areas"]) <= AREA_IDS
     assert len(clue["name"]) <= 35, "이름은 한 문장으로 짧게 (피드백·힌트 문장 안에 들어감)"
     assert len(clue["example_lines"]) >= 2
+    assert len(clue["tip"]) <= 28, "결과 화면 칩 아래 한 줄 팁은 짧게"
 
 
 @pytest.mark.parametrize("clue", DATA["clues"], ids=lambda c: c["id"])

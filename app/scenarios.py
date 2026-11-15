@@ -235,11 +235,11 @@ def _words(text: str) -> set[str]:
 def opening_choices_problems(base: dict, v: Variant) -> list[str]:
     """변형의 시작 선택지가 형식을 지키고, 바뀐 상황과 맞는지.
     원본 상황에만 있던 말('숙제')이 선택지에 남았는데 변형 상황('게임 레벨')에는 없으면 상황과 안 맞는 것으로 본다."""
-    from .choices import choice_problem  # choices 가 이 모듈을 import 하므로 여기서 불러온다
+    from .choices import choice_problem, is_friend  # choices 가 이 모듈을 import 하므로 여기서 불러온다
 
     oc = v.opening_choices.model_dump()
     problems = []
-    if choice_problem(oc) is not None:
+    if choice_problem(oc, is_friend(v.ai_role.name)) is not None:
         problems.append("opening_choices:format")
     base_text = " ".join([base["title"], base["child_setup"], base["opening_line"]])
     new_text = " ".join([v.title, v.child_setup, v.opening_line])

@@ -60,15 +60,42 @@ NORMAL_GENERIC_CASUAL = {
 }
 
 
+GENERIC_CASUAL = {
+    "correct": "이건 이상해. 먼저 어른에게 물어볼래.",
+    "doubtful": "조금 이상하긴 한데, 그래도 한 번 해 볼게.",
+    "other": "좋아. 그럼 어떻게 하면 되는지 알려 줘.",
+}
+
+
+def is_friend(role_name: str) -> bool:
+    """상대가 친구(같은 반·학원·게임 친구)면 아이도 반말로 답한다. 선배·사장님·기관에는 존댓말."""
+    return "친구" in (role_name or "")
+
+
 def normal_generic(s: dict) -> dict:
     """정상 상황 공통 선택지. 상대가 친구면 반말, 아니면(사장님·선생님·기관) 존댓말."""
-    return dict(NORMAL_GENERIC_CASUAL if "친구" in s.get("ai_role", {}).get("name", "") else NORMAL_GENERIC)
+    return dict(NORMAL_GENERIC_CASUAL if is_friend(s.get("ai_role", {}).get("name", "")) else NORMAL_GENERIC)
 
 
-def template_texts(clue_id: str | None) -> dict:
-    if clue_id and clue_id in CLUE_DEFS and CLUE_DEFS[clue_id].get("choice_templates"):
-        return dict(CLUE_DEFS[clue_id]["choice_templates"])
-    return dict(GENERIC)
+def template_texts(clue_id: str | None, casual: bool = False) -> dict:
+    """단서의 고정 선택지. casual(상대가 친구)이면 반말 선택지를 쓴다.
+    친구 영역 단서(guilt_pressure 등)는 원래 반말이라 choice_templates 하나만 있다."""
+    d = CLUE_DEFS.get(clue_id or "", {})
+    if casual and d.get("choice_templates_casual"):
+        return dict(d["choice_templates_casual"])
+    if d.get("choice_templates"):
+        return dict(d["choice_templates"])
+    return dict(GENERIC_CASUAL if casual else GENERIC)
+
+
+def polite_part(text: str) -> str | None:
+    """존댓말로 끝나는 마디('~요', '~니다')가 있으면 그 마디. 친구에게 하는 말인지 검사할 때 쓴다.
+    마디 끝만 보므로 '필요 없어'처럼 가운데 '요'는 걸리지 않는다."""
+    for part in re.split(r"[.,?!]", text):
+        part = part.strip()
+        if part.endswith("요") or part.endswith("니다"):
+            return part
+    return None
 
 
 SHORT_UTTERANCE = 6  # '네!', '알겠어요.'처럼 이보다 짧은 말은 문장 수에 세지 않는다
@@ -121,11 +148,16 @@ def _clean(data) -> dict | None:
         return None
 
 
-def choice_problem(data) -> str | None:
-    """모델 선택지가 규칙에 안 맞는 이유 (맞으면 None). 확인 도구에서도 쓴다."""
+def choice_problem(data, casual: bool = False) -> str | None:
+    """모델 선택지가 규칙에 안 맞는 이유 (맞으면 None). 확인 도구에서도 쓴다.
+    casual: 상대가 친구라서 세 답 모두 반말이어야 한다 (실제 사례: 친구에게 '안 할래요.')."""
     texts = _clean(data)
     if texts is None:
         return "correct/doubtful/other 세 개가 문자열로 오지 않음"
+    if casual:
+        for k, v in texts.items():
+            if polite_part(v):
+                return f"{k}: 친구에게 존댓말 ({v})"
     if len(set(texts.values())) != 3:
         return "같은 문장이 겹침"
     for k, v in texts.items():
@@ -147,9 +179,9 @@ def choice_problem(data) -> str | None:
     return None
 
 
-def validate_texts(data) -> dict | None:
+def validate_texts(data, casual: bool = False) -> dict | None:
     """모델이 준 {"correct": .., "doubtful": .., "other": ..} 가 규칙에 맞으면 정리해서 돌려준다."""
-    return None if choice_problem(data) else _clean(data)
+    return None if choice_problem(data, casual) else _clean(data)
 
 
 def arrange(texts: dict) -> list[Choice]:

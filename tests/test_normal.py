@@ -148,9 +148,9 @@ def test_normal_feedback_blame_rejected():
 
 @pytest.mark.parametrize("nid", NORMAL_IDS)
 def test_normal_templates_pass_filter(nid):
-    from app.judge import feedback_problem, normal_template
+    from app.judge import MAX_NORMAL_CHARS, feedback_problem, normal_template
     for outcome in ("trusted_correctly", "over_warned"):
-        assert feedback_problem(normal_template(SCENARIOS[nid], outcome)) is None
+        assert feedback_problem(normal_template(SCENARIOS[nid], outcome), MAX_NORMAL_CHARS) is None
 
 
 # ---- 정상 상황: 판정 -----------------------------------------------------------

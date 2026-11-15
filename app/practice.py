@@ -12,7 +12,7 @@
 """
 import re
 
-from .choices import arrange, normal_generic, template_texts, validate_texts
+from .choices import arrange, is_friend, normal_generic, template_texts, validate_texts
 from .content import load_all_scenarios, load_clues
 from .hints import hint_text
 from .jsonutil import clean_text, parse_json_object, split_sentences
@@ -115,7 +115,7 @@ class PracticeEngine:
             if normal and normal_risk_hits(reply, s):  # T-34: 정상 상황 대사에 위험 표현이 섞이면 다시 생성
                 continue
             target = keep[0] if keep else latest
-            return _response(s, "ok", reply, revealed + keep, target, validate_texts(choice_data),
+            return _response(s, "ok", reply, revealed + keep, target, validate_texts(choice_data, is_friend_role(s)),
                              masked=masked, source="model")
 
         return self._fallback(s, revealed, latest, masked, req.messages[-1].text)
@@ -240,7 +240,7 @@ class PracticeEngine:
 
 
 def _templates(s: dict, target: str | None) -> dict:
-    return normal_generic(s) if s.get("kind") == "normal" else template_texts(target)
+    return normal_generic(s) if s.get("kind") == "normal" else template_texts(target, is_friend_role(s))
 
 
 def _response(s, status, reply, revealed, target, model_choices, *, masked, source) -> TurnResponse:
@@ -360,7 +360,7 @@ def must_reveal_now(s: dict, revealed: list[str], messages) -> bool:
 
 def is_friend_role(s: dict) -> bool:
     """상대가 친구(같은 반·학원·게임 친구)인지. 아이도 반말로 답한다. 선배·사장님·기관에는 존댓말."""
-    return "친구" in s.get("ai_role", {}).get("name", "")
+    return is_friend(s.get("ai_role", {}).get("name", ""))
 
 
 def child_speech_lines(s: dict) -> list[str]:
