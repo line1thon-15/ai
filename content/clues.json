@@ -626,6 +626,15 @@
       },
       "sources": [
         {
+          "org": "교육부 학교폭력대책과",
+          "title": "2026학년도 학교폭력 사안처리 가이드북 (7쪽, 학교폭력 유형: 강요)",
+          "url": "https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=316&boardSeq=105456&lev=0&searchType=null&statusYN=W&page=1&s=moe&m=030214&opType=N",
+          "date": "2026-02-27",
+          "source_type": "official",
+          "strength": "direct",
+          "evidence": "학교폭력 '강요' 유형으로 '속칭 빵 셔틀, 와이파이 셔틀, 과제 대행, 게임 대행, 심부름 강요 등 의사에 반하는 행동을 강요하는 행위'를 듦."
+        },
+        {
           "org": "교육부·한국대학교육협의회",
           "title": "학교폭력 조치사항 대입 반영 가이드라인",
           "url": "https://kcue.or.kr/_upload/news/2024/08/29/application_5bcfbe188d06799e178f61e3a7eb0cb5.pdf",
@@ -690,6 +699,15 @@
           "evidence": "'의사에 반하는 행동을 강요하는 행위'를 학교폭력(강요)으로 규정함. 거절 후 계속 조르는 상황을 직접 다루지는 않음.",
           "strength": "indirect",
           "source_type": "official"
+        },
+        {
+          "org": "교육부 학교폭력대책과",
+          "title": "2026학년도 학교폭력 사안처리 가이드북 (7쪽, 학교폭력 유형: 강요)",
+          "url": "https://www.moe.go.kr/boardCnts/viewRenew.do?boardID=316&boardSeq=105456&lev=0&searchType=null&statusYN=W&page=1&s=moe&m=030214&opType=N",
+          "date": "2026-02-27",
+          "source_type": "official",
+          "strength": "indirect",
+          "evidence": "'의사에 반하는 행동을 강요하는 행위'를 학교폭력(강요)으로 설명함. 싫다는 뜻을 무시하고 계속 조르는 것과 관련 있지만, 조르는 말 자체를 다루지는 않음."
         }
       ],
       "name": "싫다고 했는데 계속 졸라요",
